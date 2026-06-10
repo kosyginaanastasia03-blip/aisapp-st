@@ -13,7 +13,7 @@ SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "ais-2026-dev-secret-key")
 #DEBUG = os.environ.get("DJANGO_DEBUG", "0") == "1"
 DEBUG = True
 ALLOWED_HOSTS = ["*"]
-CSRF_TRUSTED_ORIGINS = ["http://192.168.0.4:8010", "http://10.64.221.126:8010", "http://192.168.0.4", "http://10.64.221.126"]
+CSRF_TRUSTED_ORIGINS = os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "http://localhost").split(",")
 CSRF_COOKIE_SECURE = False
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SAMESITE = None
