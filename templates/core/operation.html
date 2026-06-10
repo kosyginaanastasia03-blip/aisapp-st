@@ -450,7 +450,7 @@ const CURRENT_USER_SITE = "{{ current_user_site }}";
                                 ? ["Код", "Наименование", "Ед.", "Количество", "Примечание", ""]
                                 : mode === "material-lines-no-price"
                                     ? ["Код", "Наименование", "Ед.", "По договору", "Запас", "Итого", "Примечание", ""]
-                                    : ["Код", "Наименование", "Ед.", "Количество", "Примечание", ""];
+                                    : ["Код", "Наименование", "Ед.", "Количество", "Цена", "Примечание", ""];
             const row = document.createElement("tr");
             headers.forEach((title) => {
                 const cell = document.createElement("th");
@@ -574,9 +574,9 @@ const CURRENT_USER_SITE = "{{ current_user_site }}";
             codeInput.addEventListener("blur", fillFromMaterial);
 
             
-            const cells = mode === "material-lines-no-price" || mode === "procurement-lines" || mode === "material-lines"
-                ? [codeInput, nameInput, unitInput, quantityInput, notesInput]
-                : [codeInput, nameInput, unitInput, quantityInput, priceInput, notesInput];
+            const cells = mode === "material-lines-no-price" || mode === "procurement-lines"
+            ? [codeInput, nameInput, unitInput, quantityInput, notesInput]
+            : [codeInput, nameInput, unitInput, quantityInput, priceInput, notesInput];
             cells.forEach((input) => {
                 const cell = document.createElement("td");
                 cell.appendChild(input);

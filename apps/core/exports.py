@@ -925,6 +925,7 @@ class Exporter:
         return context
  
     def _stock_receipt_template_context(self, receipt: StockReceipt) -> dict[str, Any]:
+        profile = self._organization_profile()
         lines = list(receipt.lines.all())
         total_amount = sum((self._line_amount(line) for line in lines), Decimal("0"))
         total_qty = sum((Decimal(line.quantity or 0) for line in lines), Decimal("0"))
@@ -946,7 +947,7 @@ class Exporter:
             "TOTAL_AMOUNT_NO_VAT": money(total_amount),
             "TOTAL_VAT": "",
             "TOTAL_WITH_VAT": money(total_amount),
-            "OKPO": "",
+            "OKPO": profile.get("okpo") or "",
             "ACCOUNT_CODE": "",
             "STOCK_CARD_NUMBER": "",
             "SENDER_POSITION": "Поставщик",

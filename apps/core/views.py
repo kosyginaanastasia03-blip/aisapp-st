@@ -253,7 +253,7 @@ CATALOG_CONFIG: dict[str, dict[str, Any]] = {
             ("Порядок", lambda obj: obj.order),
         ],
         "allowed_roles": {RoleChoices.ADMIN, RoleChoices.DIRECTOR},
-        "read_only_roles": {RoleChoices.DIRECTOR},
+        "read_only_roles": set(),
         "save_callback": "save_work_stages",
     },
 
@@ -1097,9 +1097,17 @@ def _scope_operation_form_for_supplier(*, request: HttpRequest, config: dict[str
             contracts_qs = filter_queryset_for_user(request.user, contracts_qs)
         form.fields["contract"].queryset = contracts_qs
     if "site_request" in form.fields:
+        busy_site_request_ids = ProcurementRequest.objects.filter(
+            status__in=[
+                DocumentStatus.APPROVAL,
+                DocumentStatus.APPROVED,
+                DocumentStatus.SENT_ACCOUNTING,
+                DocumentStatus.ACCEPTED,
+            ]
+        ).exclude(site_request=None).values_list("site_request_id", flat=True)
         site_requests_qs = SiteMaterialRequest.objects.select_related("contract", "requested_by").filter(
             status__in=[DocumentStatus.APPROVED, DocumentStatus.ACCEPTED, DocumentStatus.SENT_ACCOUNTING]
-        ).order_by("-request_date", "-id")
+        ).exclude(id__in=busy_site_request_ids).order_by("-request_date", "-id")
         if role == RoleChoices.SITE_MANAGER:
             site_requests_qs = filter_queryset_for_user(request.user, site_requests_qs)
         form.fields["site_request"].queryset = site_requests_qs

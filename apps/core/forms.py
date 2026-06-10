@@ -134,7 +134,7 @@ def _upload_document_type_choices() -> list[tuple[str, str]]:
 class ProcurementRequestCreateForm(BaseStyledForm, forms.Form):
     request_date = forms.DateField(widget=DateInput(), initial=timezone.localdate, label="Дата заявки")
     site_request = forms.ModelChoiceField(
-        queryset=SiteMaterialRequest.objects.filter(status__in=[DocumentStatus.APPROVED, DocumentStatus.ACCEPTED, DocumentStatus.SENT_ACCOUNTING]).order_by("-request_date"),
+        queryset=SiteMaterialRequest.objects.none(),
         required=False,
         label="Заявка участка",
         help_text="В списке только утверждённые заявки начальников участков.",
@@ -148,6 +148,27 @@ class ProcurementRequestCreateForm(BaseStyledForm, forms.Form):
         label="Позиции",
         help_text="Заполните позиции или выберите заявку участка. Цены подставит поставщик.",
     )
+
+    def __init__(self, *args, instance=None, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        busy_site_request_ids = ProcurementRequest.objects.filter(
+            status__in=[
+                DocumentStatus.APPROVAL,
+                DocumentStatus.APPROVED,
+                DocumentStatus.SENT_ACCOUNTING,
+                DocumentStatus.ACCEPTED,
+            ]
+        ).exclude(site_request=None)
+
+        if instance and instance.pk:
+            busy_site_request_ids = busy_site_request_ids.exclude(pk=instance.pk)
+
+        busy_site_request_ids = busy_site_request_ids.values_list("site_request_id", flat=True)
+
+        self.fields["site_request"].queryset = SiteMaterialRequest.objects.filter(
+            status__in=[DocumentStatus.APPROVED, DocumentStatus.ACCEPTED, DocumentStatus.SENT_ACCOUNTING]
+        ).exclude(id__in=busy_site_request_ids).order_by("-request_date")
 
     def clean_items(self):
         items = self.cleaned_data.get("items", "")
