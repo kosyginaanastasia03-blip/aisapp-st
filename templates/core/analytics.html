@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<section class="hero-panel">
+    <p>Графики, диаграммы и прогнозирование объёмов работ.</p>
+</section>
+
+<section class="workspace-shell" data-workspace-tabs data-default-workspace="">
+    <div class="workspace-switcher" role="list" aria-label="Выбор раздела аналитики">
+        <button type="button" class="workspace-choice" data-workspace-trigger="analytics" aria-controls="workspace-analytics" aria-pressed="false">
+            <span class="workspace-choice-icon" aria-hidden="true"><svg class="bi"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#bar-chart-line"></use></svg></span>
+            <span class="workspace-choice-copy">
+                <strong>Аналитика</strong>
+                <span>Графики прихода на склад и расхода материалов</span>
+            </span>
+        </button>
+        <button type="button" class="workspace-choice" data-workspace-trigger="forecast" aria-controls="workspace-forecast" aria-pressed="false">
+            <span class="workspace-choice-icon" aria-hidden="true"><svg class="bi"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#graph-up-arrow"></use></svg></span>
+            <span class="workspace-choice-copy">
+                <strong>Прогнозирование объёма работ</strong>
+                <span>Прогноз методом наименьших квадратов</span>
+            </span>
+        </button>
+        <button type="button" class="workspace-choice" data-workspace-trigger="schedule" aria-controls="workspace-schedule" aria-pressed="false">
+            <span class="workspace-choice-icon" aria-hidden="true"><svg class="bi"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#calendar-check"></use></svg></span>
+            <span class="workspace-choice-copy">
+                <strong>Контроль исполнения графика работ</strong>
+                <span>Сравнение плановых и фактических сроков</span>
+            </span>
+        </button>
+    </div>
+
+    <div class="workspace-empty" data-workspace-empty>
+        Выберите раздел аналитики для просмотра.
+    </div>
+
+    <div class="workspace-panels">
+        <!-- Раздел 1: Аналитика -->
+        <article class="panel panel-wide workspace-panel" id="workspace-analytics" data-workspace-panel="analytics" hidden style="max-height: 70vh; overflow-y: auto;">
+            <div class="panel-head">
+                <h3>Аналитика</h3>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; padding: 1.5rem;">
+                <div>
+                    <h4 style="margin-bottom: 1rem; font-size: 0.9rem; color: var(--color-text-secondary);">Приход на склад по месяцам</h4>
+                    <canvas id="chartReceipt"></canvas>
+                </div>
+                <div>
+                    <h4 style="margin-bottom: 1rem; font-size: 0.9rem; color: var(--color-text-secondary);">Топ-5 материалов по расходу</h4>
+                    <canvas id="chartMaterials"></canvas>
+                </div>
+            </div>
+        </article>
+
+        <!-- Раздел 2: Прогнозирование -->
+        <article class="panel panel-wide workspace-panel" id="workspace-forecast" data-workspace-panel="forecast" hidden style="max-height: 70vh; overflow-y: auto;">
+            <div class="panel-head">
+                <h3>Прогнозирование объёма работ</h3>
+            </div>
+            <div style="padding: 1.5rem;">
+                <p style="margin-bottom: 1rem; font-size: 0.9rem; color: var(--color-text-secondary);">
+                    Прогноз фактического объёма работ методом наименьших квадратов на основе данных журнала работ.
+                </p>
+                <form method="get" style="margin-bottom: 1rem; display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+                    <div class="field" style="margin: 0;">
+                        <label>С</label>
+                        <input type="date" name="forecast_from" value="{{ request.GET.forecast_from }}">
+                    </div>
+                    <div class="field" style="margin: 0;">
+                        <label>По</label>
+                        <input type="date" name="forecast_to" value="{{ request.GET.forecast_to }}">
+                    </div>
+                    <button type="submit" class="primary-button">Применить</button>
+                    <a href="{% url 'analytics' %}" class="ghost-button">Сбросить</a>
+                </form>
+                {% if forecasts %}
+                    <div class="table-wrap" style="margin-bottom: 2rem;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Вид работ</th>
+                                    <th>Ед. изм.</th>
+                                    <th>Записей</th>
+                                    <th>Средний факт. объём</th>
+                                    <th>Тренд</th>
+                                    <th>Прогноз след. периода</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for f in forecasts %}
+                                    <tr>
+                                        <td>{{ f.work_type }}</td>
+                                        <td>{{ f.unit }}</td>
+                                        <td>{{ f.history_count }}</td>
+                                        <td>{{ f.avg_actual }}</td>
+                                        <td>{{ f.trend_label }}</td>
+                                        <td><strong>{{ f.forecast }}</strong></td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div style="max-width: 700px;">
+                        <canvas id="chartForecast"></canvas>
+                    </div>
+                {% else %}
+                    <p>Недостаточно данных для прогноза. Нужно минимум 3 записи по одному виду работ в журнале работ.</p>
+                {% endif %}
+            </div>
+        </article>
+
+        <!-- Раздел 3: Контроль исполнения графика -->
+        <article class="panel panel-wide workspace-panel" id="workspace-schedule" data-workspace-panel="schedule" hidden style="max-height: 70vh; overflow-y: auto;">
+            <div class="panel-head">
+                <h3>Контроль исполнения графика работ</h3>
+            </div>
+            <div style="padding: 1.5rem;">
+                <p style="margin-bottom: 1rem; font-size: 0.9rem; color: var(--color-text-secondary);">
+                    Сравнение плановых сроков из графика работ с фактическими данными.
+                </p>
+                {% if schedule_control %}
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Договор</th>
+                                    <th>Вид работ</th>
+                                    <th>Этап</th>
+                                    <th>План начало</th>
+                                    <th>План конец</th>
+                                    <th>Факт начало</th>
+                                    <th>Факт конец</th>
+                                    <th>Отклонение</th>
+                                    <th>Статус</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in schedule_control %}
+                                <tr>
+                                    <td>{{ row.contract }}</td>
+                                    <td>{{ row.work_type }}</td>
+                                    <td>{{ row.stage }}</td>
+                                    <td>{{ row.plan_start }}</td>
+                                    <td>{{ row.plan_end }}</td>
+                                    <td>{{ row.actual_start|default:"—" }}</td>
+                                    <td>{{ row.actual_end|default:"—" }}</td>
+                                    <td>
+                                        {% if row.deviation is not None %}
+                                            {% if row.deviation > 0 %}+{{ row.deviation }} дн.
+                                            {% elif row.deviation < 0 %}{{ row.deviation }} дн.
+                                            {% else %}0
+                                            {% endif %}
+                                        {% else %}—{% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="status-badge status-{{ row.status_class }}">
+                                            {{ row.status }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p>Нет данных по графику работ. Создайте график работ и заполните контроль этапов.</p>
+                {% endif %}
+            </div>
+        </article>
+    </div>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+(() => {
+    const receiptLabels = {{ chart_receipt_labels|safe }};
+    const receiptData = {{ chart_receipt_data|safe }};
+    const materialLabels = {{ chart_material_labels|safe }};
+    const materialData = {{ chart_material_data|safe }};
+    const forecastLabels = {{ forecast_labels|safe }};
+    const forecastAvg = {{ forecast_avg|safe }};
+    const forecastNext = {{ forecast_next|safe }};
+
+    const initCharts = () => {
+        const receiptCanvas = document.getElementById("chartReceipt");
+        if (receiptCanvas && !receiptCanvas._chartInstance) {
+            receiptCanvas._chartInstance = new Chart(receiptCanvas, {
+                type: "bar",
+                data: {
+                    labels: receiptLabels,
+                    datasets: [{ label: "Приходов", data: receiptData, backgroundColor: "#6c8ebf" }]
+                },
+                options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+            });
+        }
+
+        const materialsCanvas = document.getElementById("chartMaterials");
+        if (materialsCanvas && !materialsCanvas._chartInstance) {
+            materialsCanvas._chartInstance = new Chart(materialsCanvas, {
+                type: "bar",
+                data: {
+                    labels: materialLabels,
+                    datasets: [{ label: "Количество", data: materialData, backgroundColor: "#82b366" }]
+                },
+                options: {
+                    indexAxis: "y",
+                    plugins: { legend: { display: false } },
+                    scales: { x: { beginAtZero: true } }
+                }
+            });
+        }
+
+        const forecastCanvas = document.getElementById("chartForecast");
+        if (forecastCanvas && forecastLabels.length && !forecastCanvas._chartInstance) {
+            forecastCanvas._chartInstance = new Chart(forecastCanvas, {
+                type: "bar",
+                data: {
+                    labels: forecastLabels,
+                    datasets: [
+                        { label: "Средний факт. объём", data: forecastAvg, backgroundColor: "#6c8ebf" },
+                        { label: "Прогноз след. периода", data: forecastNext, backgroundColor: "#d6b656" }
+                    ]
+                },
+                options: {
+                    plugins: { legend: { position: "bottom" } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+    };
+
+    // Инициализируем сразу при загрузке страницы
+    initCharts();
+
+    // И при переключении вкладок
+    document.querySelectorAll("[data-workspace-trigger]").forEach(btn => {
+        btn.addEventListener("click", () => setTimeout(initCharts, 100));
+    });
+
+    // Если после GET-запроса активна вкладка forecast — инициализируем сразу
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("forecast_from") || params.has("forecast_to")) {
+        const forecastBtn = document.querySelector('[data-workspace-trigger="forecast"]');
+        if (forecastBtn) forecastBtn.click();
+    }
+// Скрываем вкладки по роли
+    const userRole = "{{ user_role }}";
+    const roleAccess = {
+        "admin":        ["analytics", "forecast", "schedule"],
+        "director":     ["analytics", "forecast", "schedule"],
+        "procurement":  ["analytics", "forecast"],
+        "warehouse":    ["analytics"],
+        "site_manager": ["forecast", "schedule"],
+        "accounting":   ["analytics"],
+        "supplier":     [],
+    };
+    const allowed = roleAccess[userRole] || ["analytics", "forecast", "schedule"];
+
+    document.querySelectorAll("[data-workspace-trigger]").forEach(btn => {
+        const panel = btn.dataset.workspaceTrigger;
+        if (!allowed.includes(panel)) {
+            btn.closest(".workspace-choice")?.remove();
+        }
+    });
+
+    // Автоматически открываем первую доступную вкладку
+    if (allowed.length > 0) {
+        const firstBtn = document.querySelector(`[data-workspace-trigger="${allowed[0]}"]`);
+        if (firstBtn) firstBtn.click();
+    }
+})();
+</script>
+{% endblock %}

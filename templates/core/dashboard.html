@@ -1,0 +1,313 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+{# === Сокращения для проверки роли === #}
+{% with role=request.user.role is_admin=request.user.is_superuser %}
+
+<section class="metrics-grid">
+    {# Договоры СМР — Админ, Директор, Начальник участка #}
+    {% if is_admin or role == 'admin' or role == 'director' or role == 'site_manager' %}
+    <article class="metric-card metric-materials">
+        <div class="metric-icon" aria-hidden="true"><svg class="bi"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#file-earmark-text"></use></svg></div>
+        <div class="metric-copy">
+            <span>Договоры СМР</span>
+            <strong>{{ metrics.contracts }}</strong>
+            <small>активных</small>
+        </div>
+        <a class="metric-link" href="{% url 'catalog-page' 'contracts' %}">Смотреть список <svg class="bi" aria-hidden="true"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#arrow-right"></use></svg></a>
+    </article>
+    {% endif %}
+
+    {# Документы в работе — все кроме Поставщика #}
+    {% if role != 'supplier' %}
+    <article class="metric-card metric-stock">
+        <div class="metric-icon" aria-hidden="true"><svg class="bi"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#database"></use></svg></div>
+        <div class="metric-copy">
+            <span>Документы в работе</span>
+            <strong>{{ metrics.pending }}</strong>
+            <small>на согласовании</small>
+        </div>
+        <a class="metric-link" href="{{ documents_url }}">Перейти к документам <svg class="bi" aria-hidden="true"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#arrow-right"></use></svg></a>
+    </article>
+    {% endif %}
+
+    {# Документы поставщиков — Админ, Директор, Снабженец, Бухгалтер, Поставщик #}
+    {% if is_admin or role == 'admin' or role == 'director' or role == 'procurement' or role == 'accounting' or role == 'supplier' %}
+    <article class="metric-card metric-docs">
+        <div class="metric-icon" aria-hidden="true"><svg class="bi"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#journal-text"></use></svg></div>
+        <div class="metric-copy">
+            <span>Документы поставщиков</span>
+            <strong>{{ metrics.supplier_docs }}</strong>
+            <small>загружено</small>
+        </div>
+        <a class="metric-link" href="{{ documents_url }}">Все документы <svg class="bi" aria-hidden="true"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#arrow-right"></use></svg></a>
+    </article>
+    {% endif %}
+
+    {# Активные задачи — Админ, Директор, Начальник участка #}
+    {% if is_admin or role == 'admin' or role == 'director' or role == 'site_manager' %}
+    <article class="metric-card metric-tasks">
+        <div class="metric-icon" aria-hidden="true"><svg class="bi"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#list-task"></use></svg></div>
+        <div class="metric-copy">
+            <span>Активные задачи</span>
+            <strong>{{ metrics.site_tasks }}</strong>
+            <small>в работе</small>
+        </div>
+        <a class="metric-link" href="#site-balances">Открыть список <svg class="bi" aria-hidden="true"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#arrow-right"></use></svg></a>
+    </article>
+    {% endif %}
+</section>
+
+<section class="workspace-shell dashboard-workspace" data-workspace-tabs>
+    <div class="workspace-switcher" role="list" aria-label="Выбор блока панели управления">
+        {# Контроль остатков — Админ, Директор, Начальник участка #}
+        {% if is_admin or role == 'admin' or role == 'director' or role == 'site_manager' %}
+        <button type="button" class="workspace-choice" data-workspace-trigger="stock-alerts" aria-controls="stock-alerts-panel" aria-pressed="false">
+            <span class="workspace-choice-icon" aria-hidden="true"><svg class="bi"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#graph-up-arrow"></use></svg></span>
+            <span class="workspace-choice-copy">
+                <strong>Контроль остатков</strong>
+                <span>{{ stock_alerts_count }} отклонений по участкам</span>
+            </span>
+        </button>
+        {% endif %}
+
+        {# Последние документы — все #}
+        <button type="button" class="workspace-choice" data-workspace-trigger="recent" aria-controls="recent-documents" aria-pressed="false">
+            <span class="workspace-choice-icon" aria-hidden="true"><svg class="bi"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#journal-text"></use></svg></span>
+            <span class="workspace-choice-copy">
+                <strong>Последние документы</strong>
+                <span>Открыть список последних документов</span>
+            </span>
+        </button>
+
+        {# Остатки склада — Админ, Директор, Кладовщик, Снабженец #}
+        {% if is_admin or role == 'admin' or role == 'director' or role == 'warehouse' or role == 'procurement' %}
+        <button type="button" class="workspace-choice" data-workspace-trigger="warehouse" aria-controls="warehouse-balances" aria-pressed="false">
+            <span class="workspace-choice-icon" aria-hidden="true"><svg class="bi"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#database"></use></svg></span>
+            <span class="workspace-choice-copy">
+                <strong>Остатки склада</strong>
+                <span>Показать центральный склад на всю область</span>
+            </span>
+        </button>
+        {% endif %}
+
+        {# Остатки по участкам — Админ, Директор, Начальник участка #}
+        {% if is_admin or role == 'admin' or role == 'director' or role == 'site_manager' %}
+        <button type="button" class="workspace-choice" data-workspace-trigger="site" aria-controls="site-balances" aria-pressed="false">
+            <span class="workspace-choice-icon" aria-hidden="true"><svg class="bi"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#buildings"></use></svg></span>
+            <span class="workspace-choice-copy">
+                <strong>Остатки по участкам</strong>
+                <span>Показать материалы по объектам</span>
+            </span>
+        </button>
+        {% endif %}
+    </div>
+
+    <div class="workspace-empty" data-workspace-empty>
+        Выберите блок панели управления. Откроется только выбранная рабочая область.
+    </div>
+
+    <div class="workspace-panels">
+
+    {# Контроль остатков по участкам #}
+    {% if is_admin or role == 'admin' or role == 'director' or role == 'site_manager' %}
+    <article class="panel dashboard-panel workspace-panel" id="stock-alerts-panel" data-workspace-panel="stock-alerts" hidden>
+        <div class="panel-head">
+            <div class="panel-title-row">
+                <h3>Контроль остатков по участкам</h3>
+                <span class="count-badge">{{ stock_alerts_count }}</span>
+            </div>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Участок</th>
+                        <th>Договор</th>
+                        <th>Код</th>
+                        <th>Материал</th>
+                        <th>Ед.</th>
+                        <th>Остаток</th>
+                        <th>Норма остатка</th>
+                        <th>Отклонение</th>
+                        <th>Статус</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in stock_alerts %}
+                        <tr>
+                            <td>{{ item.location_name }}</td>
+                            <td>{{ item.contract_number }}</td>
+                            <td>{{ item.code }}</td>
+                            <td>{{ item.name }}</td>
+                            <td>{{ item.unit }}</td>
+                            <td>{{ item.balance }}</td>
+                            <td>{{ item.norm_balance }}</td>
+                            <td class="{% if item.status == 'excess' %}danger-value{% else %}warning-value{% endif %}">
+                                {{ item.deviation }} ({{ item.deviation_pct }}%)
+                            </td>
+                            <td>{{ item.status_label }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="9">Отклонений нет — все остатки в норме.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="panel-foot">
+            <span>Последнее обновление: {% now "d.m.Y H:i" %}</span>
+            <a href="{{ dashboard_url }}"><svg class="bi" aria-hidden="true"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#arrow-clockwise"></use></svg> Обновить</a>
+        </div>
+    </article>
+    {% endif %}
+
+    {# Последние документы — для всех #}
+    <article class="panel dashboard-panel workspace-panel" id="recent-documents" data-workspace-panel="recent" hidden>
+        <div class="panel-head">
+            <div class="panel-title-row">
+                <h3>Последние документы</h3>
+            </div>
+            <div class="panel-actions">
+                <a href="{{ documents_url }}">Все документы <svg class="bi" aria-hidden="true"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#arrow-right"></use></svg></a>
+                <details class="panel-menu">
+                    <summary aria-label="Действия по документам"><svg class="bi" aria-hidden="true"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#three-dots-vertical"></use></svg></summary>
+                    <div class="panel-menu-list">
+                        <a href="{{ documents_url }}">Открыть документы</a>
+                        <a href="{{ dashboard_url }}">Обновить</a>
+                    </div>
+                </details>
+            </div>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Тип</th>
+                        <th>Номер</th>
+                        <th>Дата</th>
+                        <th>Статус</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in recent_documents %}
+                        <tr>
+                            <td>{{ record.doc_type }}</td>
+                            <td>{{ record.doc_number }}</td>
+                            <td>{{ record.doc_date }}</td>
+                            <td><span class="status-pill status-ok">{{ record.get_status_display }}</span></td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="4">Документов пока нет.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="panel-foot">
+            <span>Последнее обновление: {% now "d.m.Y H:i" %}</span>
+            <a href="{{ documents_url }}"><svg class="bi" aria-hidden="true"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#arrow-clockwise"></use></svg> Обновить</a>
+        </div>
+    </article>
+
+    {# Остатки склада #}
+    {% if is_admin or role == 'admin' or role == 'director' or role == 'warehouse' or role == 'procurement' %}
+    <article class="panel dashboard-panel workspace-panel" id="warehouse-balances" data-workspace-panel="warehouse" hidden>
+        <div class="panel-head">
+            <div class="panel-title-row">
+                <h3>Остатки по складам</h3>
+            </div>
+            <div class="panel-actions">
+                <a href="#warehouse-balances">Все склады <svg class="bi" aria-hidden="true"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#arrow-right"></use></svg></a>
+                <details class="panel-menu">
+                    <summary aria-label="Действия по складам"><svg class="bi" aria-hidden="true"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#three-dots-vertical"></use></svg></summary>
+                    <div class="panel-menu-list">
+                        <a href="#warehouse-balances">Открыть блок</a>
+                        <a href="{{ dashboard_url }}">Обновить</a>
+                    </div>
+                </details>
+            </div>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Код</th>
+                        <th>Материал</th>
+                        <th>Ед.</th>
+                        <th>Остаток</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in warehouse_rows %}
+                        <tr>
+                            <td>{{ item.code }}</td>
+                            <td>{{ item.name }}</td>
+                            <td>{{ item.unit }}</td>
+                            <td>{{ item.warehouse_balance }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="4">Нет данных по складу.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="panel-foot">
+            <span>Последнее обновление: {% now "d.m.Y H:i" %}</span>
+            <a href="{{ dashboard_url }}"><svg class="bi" aria-hidden="true"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#arrow-clockwise"></use></svg> Обновить</a>
+        </div>
+    </article>
+    {% endif %}
+
+    {# Остатки по объектам/участкам #}
+    {% if is_admin or role == 'admin' or role == 'director' or role == 'site_manager' %}
+    <article class="panel dashboard-panel workspace-panel" id="site-balances" data-workspace-panel="site" hidden>
+        <div class="panel-head">
+            <div class="panel-title-row">
+                <h3>Остатки по объектам строительства</h3>
+            </div>
+            <div class="panel-actions">
+                <a href="#site-balances">Все объекты <svg class="bi" aria-hidden="true"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#arrow-right"></use></svg></a>
+                <details class="panel-menu">
+                    <summary aria-label="Действия по объектам"><svg class="bi" aria-hidden="true"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#three-dots-vertical"></use></svg></summary>
+                    <div class="panel-menu-list">
+                        <a href="#site-balances">Открыть блок</a>
+                        <a href="{{ dashboard_url }}">Обновить</a>
+                    </div>
+                </details>
+            </div>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Участок</th>
+                        <th>Код</th>
+                        <th>Материал</th>
+                        <th>Количество</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in site_rows %}
+                        <tr>
+                            <td>{{ item.location_name }}</td>
+                            <td>{{ item.code }}</td>
+                            <td>{{ item.name }}</td>
+                            <td>{{ item.quantity }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="4">Нет данных по участкам.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="panel-foot">
+            <span>Последнее обновление: {% now "d.m.Y H:i" %}</span>
+            <a href="{{ dashboard_url }}"><svg class="bi" aria-hidden="true"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#arrow-clockwise"></use></svg> Обновить</a>
+        </div>
+    </article>
+    {% endif %}
+    </div>
+</section>
+
+{% endwith %}
+{% endblock %}

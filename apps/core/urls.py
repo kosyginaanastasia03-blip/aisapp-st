@@ -1,0 +1,39 @@
+from django.urls import path
+
+from . import views
+
+
+urlpatterns = [
+    path("", views.dashboard, name="dashboard"),
+    path("operations/api/site-request-materials/", views.site_request_materials_json, name="site-request-materials-json"),
+    path("catalogs/<slug:slug>/", views.catalog_page, name="catalog-page"),
+    path("catalogs/contracts/<int:contract_id>/upload-scan/", views.upload_contract_scan, name="upload-contract-scan"),
+    path("operations/<str:entity_type>/<int:entity_id>/upload-scan/", views.upload_operation_scan, name="upload-operation-scan"),
+    path("operations/api/supplier-documents/", views.supplier_documents_json, name="supplier-documents-json"),
+    path("operations/api/contract-work-lines/", views.contract_work_lines_json, name="contract-work-lines-json"),
+    path("operations/api/contract-materials/", views.contract_materials_json, name="contract-materials-json"),
+    path("operations/api/supplier-document-materials/", views.supplier_document_materials_json, name="supplier-document-materials-json"),
+    path("operations/api/contract-dates/", views.contract_dates_json, name="contract-dates-json"),
+    path("operations/<slug:slug>/draft/", views.operation_draft, name="operation-draft"),
+    path("operations/api/invoice-prices/", views.invoice_prices_by_request_json, name="invoice-prices-json"),
+    path("operations/api/invoice-prices-by-site-request/", views.invoice_prices_by_site_request_json, name="invoice-prices-by-site-request-json"),
+    path("operations/api/contract-details/", views.contract_details_json, name="contract-details-json"),
+    path("operations/api/site-manager-by-site/", views.site_manager_by_site_json, name="site-manager-by-site-json"),
+    path("operations/api/work-stages/", views.work_stages_json, name="work-stages-json"),
+    path("operations/api/site-requests-by-site/", views.site_requests_by_site_json, name="site-requests-by-site"),
+    path("operations/api/schedule-stage-dates/", views.schedule_stage_dates_json, name="schedule-stage-dates-json"),
+    path("operations/<slug:slug>/", views.operation_page, name="operation-page"),
+    path("notifications/<int:notification_id>/read/", views.notification_read, name="notification-read"),
+    path("notifications/read-all/", views.notifications_read_all, name="notifications-read-all"),
+    path("notifications/feed/", views.notifications_feed, name="notifications-feed"),
+    path("documents/", views.documents, name="documents"),
+    path("archive/", views.archive, name="archive"),
+    path("reports/", views.reports, name="reports"),
+    path("analytics/", views.analytics, name="analytics"),
+    path("backups/", views.backups, name="backups"),
+    path("audit-log/", views.audit_log, name="audit-log"),
+    path("exports/document/<str:entity_type>/<int:entity_id>/", views.export_document, name="export-document"),
+    path("exports/report/", views.export_report, name="export-report"),
+    path("backups/download/<str:backup_name>/", views.download_backup, name="download-backup"),
+    path("operations/api/procurement-request-materials/", views.procurement_request_materials_json, name="procurement-request-materials-json"),
+]

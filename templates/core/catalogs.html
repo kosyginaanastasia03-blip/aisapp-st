@@ -1,0 +1,330 @@
+{% extends "base.html" %}
+
+{% load static %}
+
+{% block content %}
+<section class="hero-panel">
+    <p>{{ description }}</p>
+</section>
+
+{% if created_export_url %}
+<section class="panel">
+    <div class="panel-head">
+        <h3>Файл готов</h3>
+    </div>
+    <div class="action-row">
+        <a class="primary-button" href="{{ created_export_url }}">Скачать файл</a>
+        <a class="ghost-button" href="{{ documents_url }}">Документы в работе</a>
+    </div>
+</section>
+{% endif %}
+
+<section class="workspace-shell" data-workspace-tabs data-default-workspace="{% if is_editing or form.errors %}form{% elif created_export_url or not can_create %}list{% endif %}">
+    <div class="workspace-switcher" role="list" aria-label="Выбор рабочей области">
+        {% if can_create %}
+            <button type="button" class="workspace-choice" data-workspace-trigger="form" aria-controls="workspace-form" aria-pressed="false">
+                <span class="workspace-choice-icon" aria-hidden="true"><svg class="bi"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#collection"></use></svg></span>
+                <span class="workspace-choice-copy">
+                    <strong>{% if is_editing %}Редактировать запись{% else %}Добавить запись{% endif %}</strong>
+                    <span>Открыть форму справочника на всю рабочую область</span>
+                </span>
+            </button>
+        {% endif %}
+        <button type="button" class="workspace-choice" data-workspace-trigger="list" aria-controls="workspace-list" aria-pressed="false">
+            <span class="workspace-choice-icon" aria-hidden="true"><svg class="bi"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#journal-text"></use></svg></span>
+            <span class="workspace-choice-copy">
+                <strong>Список документов</strong>
+                <span>Открыть таблицу справочника на всю рабочую область</span>
+            </span>
+        </button>
+    </div>
+
+    <div class="workspace-empty" data-workspace-empty>
+        Выберите, с каким блоком работать: форма записи или список справочника.
+    </div>
+
+    <div class="workspace-panels">
+    {% if can_create %}
+    <article class="panel workspace-panel" id="workspace-form" data-workspace-panel="form" hidden>
+        <div class="panel-head">
+            <h3>{% if is_editing %}Редактировать запись{% else %}Добавить запись{% endif %}</h3>
+        </div>
+        <form method="post" class="stack-form" enctype="multipart/form-data">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="save">
+            {% if is_editing %}
+                <input type="hidden" name="object_id" value="{{ form.instance.pk }}">
+            {% endif %}
+            {% if form.non_field_errors %}
+                <div class="field-error">{{ form.non_field_errors|join:", " }}</div>
+            {% endif %}
+            {% for field in form %}
+                {% if field.name == "work_lines" %}
+                    <div class="field" id="work-lines-section">
+                        <label>Виды работ и объёмы (Раздел 3.2)</label>
+                        {{ field }}
+                        <div class="items-grid" data-work-lines-grid>
+                            <div class="table-wrap">
+                                <table class="items-table">
+                                    <thead>
+                                        <tr>
+                                            <th>№</th>
+                                            <th>Раздел</th>
+                                            <th>Наименование работ</th>
+                                            <th>Ед. изм.</th>
+                                            <th>Количество</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody data-work-lines-body></tbody>
+                                </table>
+                            </div>
+                            <div class="action-row">
+                                <button type="button" class="secondary-button" data-work-lines-add>Добавить строку</button>
+                                <button type="button" class="ghost-button" data-work-lines-clear>Очистить</button>
+                            </div>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="field">
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.help_text %}
+                            <div class="field-help">{{ field.help_text }}</div>
+                        {% endif %}
+                        {% if field.errors %}
+                            <div class="field-error">{{ field.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            {% endfor %}
+            <div class="action-row">
+                <button type="submit" class="primary-button">{% if is_editing %}Сохранить изменения{% else %}Сохранить{% endif %}</button>
+                {% if is_editing %}
+                    <a class="ghost-button" href="{% url 'catalog-page' current_catalog %}">Отменить</a>
+                {% endif %}
+            </div>
+        </form>
+    </article>
+    {% endif %}
+
+    <article class="panel panel-wide workspace-panel" id="workspace-list" data-workspace-panel="list" hidden>
+        <div class="panel-head">
+            <h3>Список документов</h3>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        {% for header in headers %}
+                            <th>{{ header }}</th>
+                        {% endfor %}
+                        {% if catalog_has_actions %}
+                            <th>Действия</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in rows %}
+                        <tr>
+                            {% for cell in row.cells %}
+                                <td>{{ cell }}</td>
+                            {% endfor %}
+                            {% if catalog_has_actions %}
+                                <td>
+                                    <div class="action-row">
+                                        {% if row.export_url %}
+                                            <a class="ghost-button" href="{{ row.export_url }}">Выгрузить</a>
+                                        {% endif %}
+                                        {% if row.estimate_url %}
+                                            <a class="ghost-button" href="{{ row.estimate_url }}" target="_blank">Смета</a>
+                                        {% endif %}
+                                        {% if current_catalog == "contracts" %}
+                                            {% if row.has_schedule %}
+                                                {% if row.schedule_scan_url %}
+                                                    <a class="ghost-button" href="{{ row.schedule_scan_url }}" target="_blank">Открыть скан графика</a>
+                                                {% endif %}
+                                                <form method="post" action="{% url 'upload-operation-scan' 'work_schedule' row.schedule_id %}" enctype="multipart/form-data" class="inline-form">
+                                                    {% csrf_token %}
+                                                    <label class="ghost-button" style="cursor:pointer; margin:0;">
+                                                        {% if row.schedule_scan_url %}Заменить скан графика{% else %}Загрузить скан графика{% endif %}
+                                                        <input type="file" name="scan_file" accept=".pdf,.jpg,.jpeg,.png" style="display:none;" onchange="this.form.submit()">
+                                                    </label>
+                                                </form>
+                                            {% else %}
+                                                <a class="ghost-button" href="{% url 'operation-page' 'work-schedules' %}">Создать график</a>
+                                            {% endif %}
+                                            {% if row.scan_url %}
+                                                <a class="ghost-button" href="{{ row.scan_url }}" target="_blank">Открыть скан</a>
+                                            {% endif %}
+                                            {% if row.can_upload_scan %}
+                                                <form method="post" action="{% url 'upload-contract-scan' row.id %}"enctype="multipart/form-data" class="inline-form">
+                                                    {% csrf_token %}
+                                                    <label class="ghost-button" style="cursor:pointer; margin:0;">
+                                                        {% if row.scan_url %}Заменить скан{% else %}Загрузить скан{% endif %}
+                                                        <input type="file" name="scan_file" accept=".pdf,.jpg,.jpeg,.png" style="display:none;" onchange="this.form.submit()">
+                                                    </label>
+                                                </form>
+                                            {% endif %}
+                                        {% endif %}
+                                        {% if catalog_has_manage_actions and row.can_edit %}
+                                            <a class="ghost-button" href="{{ row.edit_url }}">Изменить</a>
+                                            <form method="post" class="inline-form">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="action" value="delete">
+                                                <input type="hidden" name="object_id" value="{{ row.id }}">
+                                                <button type="submit" class="secondary-button">Удалить</button>
+                                            </form>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            {% endif %}
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="{% if catalog_has_actions %}{{ headers|length|add:'1' }}{% else %}{{ headers|length }}{% endif %}">Записей пока нет.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+    </div>
+</section>
+{{ work_type_choices|json_script:"work-type-choices-data" }}
+<script>
+(() => {
+    const section = document.getElementById("work-lines-section");
+    if (!section) return;
+
+    const hiddenInput = section.querySelector('input[name="work_lines"]');
+    const tbody = section.querySelector("[data-work-lines-body]");
+    const addBtn = section.querySelector("[data-work-lines-add]");
+    const clearBtn = section.querySelector("[data-work-lines-clear]");
+    if (!hiddenInput || !tbody) return;
+
+    const workTypes = (() => {
+        const node = document.getElementById("work-type-choices-data");
+        try { return JSON.parse(node?.textContent || "[]"); } catch { return []; }
+    })();
+
+    const editableCell = (value = "", type = "text", style = "") => {
+        const input = document.createElement("input");
+        input.type = type;
+        input.value = value;
+        if (type === "number") { input.step = "0.001"; input.min = "0"; }
+        if (style) input.style = style;
+        return input;
+    };
+
+    const readRows = () => Array.from(tbody.querySelectorAll("tr")).map((row, i) => {
+        const inputs = row.querySelectorAll("input, select");
+        return {
+            order: i + 1,
+            section: inputs[0]?.value || "",
+            work_type: inputs[1]?.value || "",
+            unit: inputs[2]?.value || "",
+            quantity: inputs[3]?.value || "",
+        };
+    }).filter(r => r.work_type.trim());
+
+    const syncHidden = () => {
+        hiddenInput.value = JSON.stringify(readRows());
+    };
+
+    const createRow = (seed = {}) => {
+        const row = document.createElement("tr");
+
+        const numCell = document.createElement("td");
+        numCell.className = "row-num";
+        numCell.textContent = tbody.children.length + 1;
+        row.appendChild(numCell);
+
+        const sectionInput = editableCell(seed.section || "", "text", "width:100px");
+
+        const nameSelect = document.createElement("select");
+        nameSelect.className = "form-input";
+        nameSelect.style.width = "300px";
+        const emptyOpt = document.createElement("option");
+        emptyOpt.value = "";
+        emptyOpt.textContent = "Выберите вид работ";
+        nameSelect.appendChild(emptyOpt);
+        workTypes.forEach(wt => {
+            const opt = document.createElement("option");
+            opt.value = wt;
+            opt.textContent = wt;
+            if (wt === seed.work_type) opt.selected = true;
+            nameSelect.appendChild(opt);
+        });
+        nameSelect.addEventListener("change", syncHidden);
+
+        const unitInput = editableCell(seed.unit || "", "text", "width:80px");
+        const qtyInput = editableCell(seed.quantity || "", "number", "width:100px");
+
+        const sectionTd = document.createElement("td");
+        sectionTd.appendChild(sectionInput);
+        sectionInput.addEventListener("input", syncHidden);
+        row.appendChild(sectionTd);
+
+        const nameTd = document.createElement("td");
+        nameTd.appendChild(nameSelect);
+        row.appendChild(nameTd);
+
+        const unitTd = document.createElement("td");
+        unitTd.appendChild(unitInput);
+        unitInput.addEventListener("input", syncHidden);
+        row.appendChild(unitTd);
+
+        const qtyTd = document.createElement("td");
+        qtyTd.appendChild(qtyInput);
+        qtyInput.addEventListener("input", syncHidden);
+        row.appendChild(qtyTd);
+
+        const delBtn = document.createElement("button");
+        delBtn.type = "button";
+        delBtn.className = "ghost-button row-remove-button";
+        delBtn.textContent = "Удалить";
+        delBtn.addEventListener("click", () => {
+            if (tbody.children.length === 1) {
+                row.querySelectorAll("input, select").forEach(i => {
+                    if (i.tagName === "SELECT") i.selectedIndex = 0;
+                    else i.value = "";
+                });
+            } else {
+                row.remove();
+            }
+            Array.from(tbody.querySelectorAll("tr")).forEach((r, i) => {
+                const nc = r.querySelector(".row-num");
+                if (nc) nc.textContent = i + 1;
+            });
+            syncHidden();
+        });
+        const delTd = document.createElement("td");
+        delTd.appendChild(delBtn);
+        row.appendChild(delTd);
+        return row;
+    };
+
+    const loadRows = () => {
+        tbody.innerHTML = "";
+        let rows = [];
+        try { rows = JSON.parse(hiddenInput.value || "[]"); } catch {}
+        if (!rows.length) rows = [{}];
+        rows.forEach(r => tbody.appendChild(createRow(r)));
+    };
+
+    addBtn?.addEventListener("click", () => {
+        tbody.appendChild(createRow());
+        syncHidden();
+    });
+
+    clearBtn?.addEventListener("click", () => {
+        tbody.innerHTML = "";
+        tbody.appendChild(createRow());
+        syncHidden();
+    });
+
+    loadRows();
+})();
+</script>
+{% endblock %}

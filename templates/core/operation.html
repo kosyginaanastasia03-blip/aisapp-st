@@ -1,0 +1,1654 @@
+﻿{% extends "base.html" %}
+
+{% load static %}
+
+{% block content %}
+<section class="hero-panel">
+    <p>{{ description }}</p>
+</section>
+
+
+<section class="workspace-shell" data-workspace-tabs data-default-workspace="{% if is_rework_edit or form.errors or draft_loaded %}create{% elif created_export_url or not can_create %}recent{% endif %}">
+    <div class="workspace-switcher" role="list" aria-label="Выбор рабочей области">
+        {% if can_create %}
+            <button type="button" class="workspace-choice" data-workspace-trigger="create" aria-controls="workspace-create" aria-pressed="false">
+                <span class="workspace-choice-icon" aria-hidden="true"><svg class="bi"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#clipboard-check"></use></svg></span>
+                <span class="workspace-choice-copy">
+                    <strong>{% if is_rework_edit %}Доработать документ{% else %}Создать документ{% endif %}</strong>
+                    <span>{% if is_rework_edit %}Открыть форму повторной отправки{% else %}Открыть форму на всю рабочую область{% endif %}</span>
+                </span>
+            </button>
+        {% endif %}
+        <button type="button" class="workspace-choice" data-workspace-trigger="recent" aria-controls="workspace-recent" aria-pressed="false">
+            <span class="workspace-choice-icon" aria-hidden="true"><svg class="bi"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#journal-text"></use></svg></span>
+            <span class="workspace-choice-copy">
+                <strong>Список документов</strong>
+                <span>Открыть список документов на всю рабочую область</span>
+            </span>
+        </button>
+    </div>
+
+    <div class="workspace-empty" data-workspace-empty>
+        Выберите, с каким блоком работать: создание документа или список документов.
+    </div>
+
+    <div class="workspace-panels">
+    {% if can_create %}
+    <article class="panel workspace-panel" id="workspace-create" data-workspace-panel="create" hidden>
+        <div class="panel-head">
+            <h3>{% if is_rework_edit %}Доработать документ{% else %}Создать документ{% endif %}</h3>
+        </div>
+        <form method="post" enctype="multipart/form-data" class="stack-form" data-autosave-url="{% if not is_rework_edit %}{{ autosave_url }}{% endif %}">
+            {% csrf_token %}
+            {% if is_rework_edit %}
+                <input type="hidden" name="rework_record_id" value="{{ rework_record.id }}">
+            {% endif %}
+            <div class="field-help" id="draft-status">
+                {% if is_rework_edit %}
+                    Внесите правки и сохраните: документ будет повторно отправлен по маршруту согласования.
+                {% elif draft_loaded %}
+                    Загружен автосохраненный черновик.
+                {% else %}
+                    Черновик сохраняется автоматически.
+                {% endif %}
+            </div>
+            {% if is_rework_edit and rework_reason %}
+                <div class="field-help rework-reason-note">
+                    <strong>Причина возврата:</strong> {{ rework_reason }}
+                    {% if rework_reason_by %}<span>({{ rework_reason_by }})</span>{% endif %}
+                </div>
+            {% endif %}
+            {% if form.non_field_errors %}
+                <div class="field-error">{{ form.non_field_errors|join:", " }}</div>
+            {% endif %}
+            {% for field in form %}
+                {% if field.name == "items" %}
+                    <div class="field">
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        <div class="items-grid" data-items-grid>
+                            <div class="table-wrap">
+                                <table class="items-table">
+                                    <thead data-items-head></thead>
+                                    <tbody data-items-body></tbody>
+                                </table>
+                            </div>
+                            <div class="action-row">
+                               <button type="button" class="secondary-button" data-items-add>Добавить строку</button>
+                                <button type="button" class="ghost-button" data-items-clear>Очистить строки</button>
+                                <button type="button" class="ghost-button" data-load-from-contract>Загрузить из заявки участка</button>
+                            </div>
+                        </div>
+                        {% if field.help_text %}
+                            <div class="field-help">{{ field.help_text }}</div>
+                        {% endif %}
+                        {% if field.errors %}
+                            <div class="field-error">{{ field.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                {% else %}
+                    <div class="field">
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.help_text %}
+                            <div class="field-help">{{ field.help_text }}</div>
+                        {% endif %}
+                        {% if field.errors %}
+                            <div class="field-error">{{ field.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            {% endfor %}
+            <button type="submit" class="primary-button">{% if is_rework_edit %}Сохранить и отправить повторно{% else %}Создать{% endif %}</button>
+        </form>
+    </article>
+    {% endif %}
+
+    <article class="panel panel-wide workspace-panel" id="workspace-recent" data-workspace-panel="recent" hidden>
+        <div class="panel-head">
+            <h3>Список документов</h3>
+        </div>
+        <div class="filter-grid" style="padding: 1rem 0; display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+            <div class="field" style="margin: 0;">
+                <label for="doc-filter-number">Номер</label>
+                <input type="text" id="doc-filter-number" placeholder="Введите номер...">
+            </div>
+            <div class="field" style="margin: 0;">
+                <label for="doc-filter-date-from">С</label>
+                <input type="date" id="doc-filter-date-from">
+            </div>
+            <div class="field" style="margin: 0;">
+                <label for="doc-filter-date-to">По</label>
+                <input type="date" id="doc-filter-date-to">
+            </div>
+            <div class="field" style="margin: 0;">
+                <label for="doc-filter-status">Статус</label>
+                <select id="doc-filter-status">
+                    <option value="">Все статусы</option>
+                    <option value="черновик">Черновик</option>
+                    <option value="на утверждении">На утверждении</option>
+                    <option value="утвержден">Утвержден</option>
+                    <option value="отправлен в бухгалтерию">Отправлен в бухгалтерию</option>
+                    <option value="принят">Принят</option>
+                    <option value="возвращен на доработку">Возвращен на доработку</option>
+                    <option value="загружен поставщиком">Загружен поставщиком</option>
+                    <option value="подтверждение поставки">Подтверждение поставки</option>
+                </select>
+            </div>
+            <button type="button" class="primary-button" id="doc-filter-apply">Применить</button>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        {% for header in headers %}
+                            <th>{{ header }}</th>
+                        {% endfor %}
+                        {% if operation_has_export_actions %}
+                            <th>Действия</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in rows %}
+                        <tr>
+                            {% for cell in row.cells %}
+                                <td>{{ cell }}</td>
+                            {% endfor %}
+                            {% if operation_has_export_actions %}
+                                <td>
+                                    <div class="action-row">
+                                        {% if row.export_url %}
+                                            <a class="ghost-button" href="{{ row.export_url }}">Выгрузить</a>
+                                        {% endif %}
+                                        {% if row.payment_order_url %}
+                                            <a class="ghost-button" href="{{ row.payment_order_url }}" target="_blank">Платёжка</a>
+                                        {% endif %}
+                                        {% if current_operation %}
+                                            {% if row.scan_url %}
+                                                <a class="ghost-button" href="{{ row.scan_url }}" target="_blank">Открыть скан</a>
+                                            {% endif %}
+                                            <form method="post" action="{% url 'upload-operation-scan' entity_type row.id %}" enctype="multipart/form-data" class="inline-form">
+                                                {% csrf_token %}
+                                                <label class="ghost-button" style="cursor:pointer; margin:0;">
+                                                    {% if row.scan_url %}Заменить скан{% else %}Загрузить скан{% endif %}
+                                                    <input type="file" name="scan_file" accept=".pdf,.jpg,.jpeg,.png" style="display:none;" onchange="this.form.submit()">
+                                                </label>
+                                            </form>
+                                        {% endif %}
+                                        {% if row.status_choices %}
+                                            <form method="post" action="{% url 'documents' %}" class="inline-form" data-op-status-form>
+                                                {% csrf_token %}
+                                                <input type="hidden" name="record_id" value="{{ row.record_id }}">
+                                                <select name="new_status" class="form-input compact-input" data-op-status-select>
+                                                    {% for value, label in row.status_choices %}
+                                                        <option value="{{ value }}" {% if value == row.current_status %}selected{% endif %}>{{ label }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                                <textarea name="rework_reason" class="form-input compact-input" rows="2" placeholder="Причина возврата" data-op-rework-reason hidden></textarea>
+                                                <button type="submit" class="secondary-button">Обновить</button>
+                                            </form>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            {% endif %}
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="{% if operation_has_export_actions %}{{ headers|length|add:'1' }}{% else %}{{ headers|length }}{% endif %}">Документов пока нет.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+    </div>
+</section>
+
+{{ material_catalog|json_script:"material-catalog-data" }}
+{{ worker_catalog|json_script:"worker-catalog-data" }}
+<script>
+const CURRENT_USER_FULLNAME = "{{ current_user_fullname }}";
+const CURRENT_USER_SITE = "{{ current_user_site }}";
+</script>
+
+<script>
+(() => {
+    // Показываем/скрываем поле причины возврата при выборе статуса "Возвращен на доработку"
+    document.querySelectorAll("[data-op-status-form]").forEach((form) => {
+        const select = form.querySelector("[data-op-status-select]");
+        const reason = form.querySelector("[data-op-rework-reason]");
+        if (!select || !reason) return;
+        const REWORK_STATUS = "rework";
+        const syncReason = () => {
+            const needsReason = select.value === REWORK_STATUS;
+            reason.hidden = !needsReason;
+            reason.required = needsReason;
+            if (!needsReason) reason.value = "";
+        };
+        select.addEventListener("change", syncReason);
+        syncReason();
+    });
+})();
+</script>
+
+<script>
+(() => {
+    const form = document.querySelector("form[data-autosave-url]");
+    if (!form) return;
+
+    const statusNode = document.getElementById("draft-status");
+    const autosaveUrl = form.dataset.autosaveUrl;
+    let timerId = null;
+
+    const updateStatus = (text) => {
+        if (statusNode) {
+            statusNode.textContent = text;
+        }
+    };
+
+    const saveDraft = async () => {
+        if (!autosaveUrl) return;
+        try {
+            const response = await fetch(autosaveUrl, {
+                method: "POST",
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+                body: new FormData(form),
+            });
+            if (!response.ok) {
+                throw new Error("autosave failed");
+            }
+            const payload = await response.json();
+            if (payload.saved) {
+                updateStatus(`Черновик сохранен в ${payload.saved_at}`);
+            } else {
+                updateStatus("Черновик очищен");
+            }
+        } catch (_error) {
+            updateStatus("Не удалось сохранить черновик");
+        }
+    };
+
+    const scheduleSave = () => {
+        if (!autosaveUrl) return;
+        updateStatus("Сохраняем черновик...");
+        window.clearTimeout(timerId);
+        timerId = window.setTimeout(saveDraft, 900);
+    };
+
+    const parseJsonScript = (id) => {
+        const node = document.getElementById(id);
+        if (!node) return [];
+        try {
+            const parsed = JSON.parse(node.textContent || "[]");
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (_error) {
+            return [];
+        }
+    };
+
+    const materialCatalog = parseJsonScript("material-catalog-data");
+    const workerCatalog = parseJsonScript("worker-catalog-data");
+
+    const normalizeCode = (value) => String(value || "").trim().toUpperCase();
+    const materialIndex = new Map(materialCatalog.map((item) => [normalizeCode(item.code), item]));
+    const materialNameIndex = new Map(materialCatalog.map((item) => [String(item.name || "").trim().toLowerCase(), item]));
+    const workerIndex = new Map(workerCatalog.map((item) => [String(item.employee_number || "").trim(), item]));
+    const workerNameIndex = new Map(workerCatalog.map((item) => [String(item.full_name || "").trim().toLowerCase(), item]));
+
+    const ensureDatalist = (id, values, formatter) => {
+        if (!values.length || document.getElementById(id)) return;
+        const datalist = document.createElement("datalist");
+        datalist.id = id;
+        values.forEach((value) => {
+            const option = document.createElement("option");
+            const formatted = formatter(value);
+            option.value = formatted.value;
+            option.label = formatted.label;
+            datalist.appendChild(option);
+        });
+        form.appendChild(datalist);
+    };
+
+    ensureDatalist("material-code-options", materialCatalog, (item) => ({
+        value: String(item.code || ""),
+        label: `${item.code || ""} — ${item.name || ""}`.trim(),
+    }));
+
+    ensureDatalist("material-name-options", materialCatalog, (item) => ({
+        value: String(item.name || ""),
+        label: `${item.code || ""} ${item.name || ""}`.trim(),
+    }));
+
+    ensureDatalist("worker-number-options", workerCatalog, (item) => ({
+        value: String(item.employee_number || ""),
+        label: `${item.employee_number || ""} ${item.full_name || ""}`.trim(),
+    }));
+
+    ensureDatalist("worker-name-options", workerCatalog, (item) => ({
+        value: String(item.full_name || ""),
+        label: `${item.employee_number || ""} ${item.full_name || ""}`.trim(),
+    }));
+
+    const parseStoredRows = (rawValue) => {
+        const payload = String(rawValue || "").trim();
+        if (!payload) return [];
+        try {
+            const parsed = JSON.parse(payload);
+            if (Array.isArray(parsed)) {
+                return parsed;
+            }
+        } catch (_error) {
+            return [];
+        }
+        return [];
+    };
+
+    const stringifyRows = (rows, mode) => {
+    const normalize = (row) => {
+        if (mode === "ppe-lines") {
+            return {
+                employee_number: String(row.employee_number || "").trim(),
+                worker_name: String(row.worker_name || "").trim(),
+                material_code: String(row.material_code || "").trim(),
+                material_name: String(row.material_name || "").trim(),
+                quantity: String(row.quantity || "").trim(),
+                service_life_months: String(row.service_life_months || "").trim(),
+                clothing_size: String(row.clothing_size || "").trim(),
+                shoe_size: String(row.shoe_size || "").trim(),
+            };
+        }
+        if (mode === "schedule-lines") {
+            return {
+                work_type: String(row.work_type || "").trim(),
+                stage: String(row.stage || "").trim(),
+                executor: String(row.executor || "").trim(),
+                start_date: String(row.start_date || "").trim(),
+                end_date: String(row.end_date || "").trim(),
+                notes: String(row.notes || "").trim(),
+            };
+        }
+        if (mode === "stage-lines") {
+            return {
+                stage_name: String(row.stage_name || "").trim(),
+            };
+        }
+        if (mode === "supplier-lines") {
+            return {
+                material_code: String(row.material_code || "").trim(),
+                material_name: String(row.material_name || "").trim(),
+                unit: String(row.unit || "").trim(),
+                quantity: String(row.quantity || "").trim(),
+                unit_price: String(row.unit_price || "").trim(),
+                amount: String(row.amount || "").trim(),
+            };
+        }
+        return {
+            material_code: String(row.material_code || "").trim(),
+            quantity: String(row.quantity || "").trim(),
+            unit_price: String(row.unit_price || "").trim(),
+            notes: String(row.notes || "").trim(),
+            reserve: String(row.reserve || "0").trim(),
+        };
+        if (mode === "procurement-lines") {
+            return {
+                material_code: String(row.material_code || "").trim(),
+                quantity: String(row.quantity || "").trim(),
+                notes: String(row.notes || "").trim(),
+            };
+        }
+    };
+
+        const normalizedRows = rows
+            .map(normalize)
+            .filter((row) => Object.values(row).some((value) => String(value || "").trim() !== ""));
+
+        return normalizedRows.length ? JSON.stringify(normalizedRows) : "";
+    };
+
+    const itemsHiddenInput = form.querySelector('input[name="items"][type="hidden"]');
+    const itemsGrid = form.querySelector("[data-items-grid]");
+    if (itemsHiddenInput && itemsGrid) {
+        const mode = itemsHiddenInput.dataset.itemsMode || "material-lines";
+        const tableHead = itemsGrid.querySelector("[data-items-head]");
+        const tableBody = itemsGrid.querySelector("[data-items-body]");
+        const addButton = itemsGrid.querySelector("[data-items-add]");
+        const clearButton = itemsGrid.querySelector("[data-items-clear]");
+
+        const storedRows = parseStoredRows(itemsHiddenInput.value);
+
+        const readOnlyCell = (value = "") => {
+            const input = document.createElement("input");
+            input.type = "text";
+            input.value = value;
+            input.readOnly = true;
+            input.className = "is-readonly";
+            return input;
+        };
+
+        const editableCell = ({ type = "text", value = "", step = "", min = "", list = "", col = "" } = {}) => {
+            const input = document.createElement("input");
+            input.type = type;
+            input.value = value;
+            if (step) input.step = step;
+            if (min) input.min = min;
+            if (list) input.setAttribute("list", list);
+            if (col) input.dataset.col = col;
+            return input;
+        };
+
+        const buildHeader = () => {
+            const headers = mode === "ppe-lines"
+                ? ["ФИО", "Таб. номер", "Наименование", "Код", "Кол-во", "Срок, мес", ""]
+                : mode === "schedule-lines"
+                    ? ["Вид работ", "Этап", "Исполнитель", "Дата начала", "Дата окончания", "Примечание", ""]
+                    : mode === "stage-lines"
+                        ? ["Этап", ""]
+                        : mode === "supplier-lines"
+                            ? ["Код", "Наименование", "Ед.", "Кол-во", "Цена", "Сумма", ""]
+                            : mode === "procurement-lines"
+                                ? ["Код", "Наименование", "Ед.", "Количество", "Примечание", ""]
+                                : mode === "material-lines-no-price"
+                                    ? ["Код", "Наименование", "Ед.", "По договору", "Запас", "Итого", "Примечание", ""]
+                                    : ["Код", "Наименование", "Ед.", "Количество", "Примечание", ""];
+            const row = document.createElement("tr");
+            headers.forEach((title) => {
+                const cell = document.createElement("th");
+                cell.textContent = title;
+                row.appendChild(cell);
+            });
+            tableHead.innerHTML = "";
+            tableHead.appendChild(row);
+        };
+
+        const readRows = () => {
+    return Array.from(tableBody.querySelectorAll("tr")).map((row) => {
+        if (mode === "ppe-lines") {
+            return {
+                employee_number: row.querySelector('input[data-col="employee_number"]')?.value || "",
+                worker_name: row.querySelector('input[data-col="worker_name"]')?.value || "",
+                material_code: row.querySelector('input[data-col="material_code"]')?.value || "",
+                material_name: row.querySelector('input[data-col="material_name"]')?.value || "",
+                quantity: row.querySelector('input[data-col="quantity"]')?.value || "",
+                service_life_months: row.querySelector('input[data-col="service_life_months"]')?.value || "",
+                clothing_size: row.querySelector('input[data-col="clothing_size"]')?.value || "",
+                shoe_size: row.querySelector('input[data-col="shoe_size"]')?.value || "",
+            };
+        }
+        if (mode === "schedule-lines") {
+            return {
+                work_type: row.querySelector('input[data-col="work_type"]')?.value || "",
+                stage: row.querySelector('input[data-col="stage"]')?.value || "",
+                executor: row.querySelector('input[data-col="executor"]')?.value || "",
+                start_date: row.querySelector('input[data-col="start_date"]')?.value || "",
+                end_date: row.querySelector('input[data-col="end_date"]')?.value || "",
+                notes: row.querySelector('input[data-col="notes"]')?.value || "",
+            };
+        }
+        if (mode === "stage-lines") {
+            return {
+                stage_name: row.querySelector('input[data-col="stage_name"]')?.value || "",
+            };
+        }
+        if (mode === "supplier-lines") {
+            return {
+                material_code: row.querySelector('input[data-col="material_code"]')?.value || "",
+                material_name: row.querySelector('input[data-col="material_name"]')?.value || "",
+                unit: row.querySelector('input[data-col="unit"]')?.value || "",
+                quantity: row.querySelector('input[data-col="quantity"]')?.value || "",
+                unit_price: row.querySelector('input[data-col="unit_price"]')?.value || "",
+                amount: row.querySelector('input[data-col="amount"]')?.value || "",
+            };
+        }
+        return {
+            material_code: row.querySelector('input[data-col="material_code"]')?.value || "",
+            quantity: row.querySelector('input[data-col="quantity"]')?.value || "",
+            unit_price: row.querySelector('input[data-col="unit_price"]')?.value || "",
+            notes: row.querySelector('input[data-col="notes"]')?.value || "",
+            reserve: row.querySelector('input[data-col="reserve"]')?.value || "0",
+        };
+        if (mode === "procurement-lines") {
+            return {
+                material_code: row.querySelector('input[data-col="material_code"]')?.value || "",
+                quantity: row.querySelector('input[data-col="quantity"]')?.value || "",
+                notes: row.querySelector('input[data-col="notes"]')?.value || "",
+            };
+        }
+    });
+};
+        const syncHiddenItems = (triggerAutosave = true) => {
+            itemsHiddenInput.value = stringifyRows(readRows(), mode);
+            if (triggerAutosave) {
+                scheduleSave();
+            }
+        };
+
+        const createDeleteButton = (row) => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "ghost-button row-remove-button";
+            button.textContent = "Удалить";
+            button.addEventListener("click", () => {
+                if (tableBody.children.length === 1) {
+                    row.querySelectorAll("input:not([readonly])").forEach((input) => {
+                        input.value = "";
+                    });
+                    row.querySelectorAll("input[readonly]").forEach((input) => {
+                        input.value = "";
+                    });
+                } else {
+                    row.remove();
+                }
+                syncHiddenItems();
+            });
+            return button;
+        };
+
+        const wireRowEvents = (row, onChange) => {
+            row.querySelectorAll("input:not([readonly])").forEach((input) => {
+                input.addEventListener("input", onChange);
+                input.addEventListener("change", onChange);
+            });
+        };
+
+        const createMaterialRow = (seed = {}) => {
+            const row = document.createElement("tr");
+            const codeInput = editableCell({ value: seed.material_code || "", list: "material-code-options", col: "material_code" });
+            const nameInput = readOnlyCell();
+            const unitInput = readOnlyCell();
+            const quantityInput = editableCell({ type: "number", value: seed.quantity || "", step: "0.001", min: "0", col: "quantity" });
+            const priceInput = editableCell({ type: "number", value: seed.unit_price || "", step: "0.01", min: "0", col: "unit_price" });
+            const notesInput = editableCell({ value: seed.notes || "", col: "notes" });
+
+            const fillFromMaterial = () => {
+                const material = materialIndex.get(normalizeCode(codeInput.value));
+                nameInput.value = material?.name || "";
+                unitInput.value = material?.unit || "";
+                if (material && !String(priceInput.value || "").trim()) {
+                    priceInput.value = material.price || "";
+                }
+            };
+
+            fillFromMaterial();
+            codeInput.addEventListener("change", fillFromMaterial);
+            codeInput.addEventListener("blur", fillFromMaterial);
+
+            
+            const cells = mode === "material-lines-no-price" || mode === "procurement-lines" || mode === "material-lines"
+                ? [codeInput, nameInput, unitInput, quantityInput, notesInput]
+                : [codeInput, nameInput, unitInput, quantityInput, priceInput, notesInput];
+            cells.forEach((input) => {
+                const cell = document.createElement("td");
+                cell.appendChild(input);
+                row.appendChild(cell);
+        });
+
+            const removeCell = document.createElement("td");
+            removeCell.appendChild(createDeleteButton(row));
+            row.appendChild(removeCell);
+
+            wireRowEvents(row, () => {
+                fillFromMaterial();
+                syncHiddenItems();
+            });
+
+            return row;
+        };
+
+        const createPpeRow = (seed = {}) => {
+            const row = document.createElement("tr");
+            const employeeNameInput = editableCell({ value: seed.worker_name || "", list: "worker-name-options", col: "worker_name" });
+            const employeeInput = readOnlyCell(seed.employee_number || "");
+            employeeInput.dataset.col = "employee_number";
+            const nameInput = editableCell({ value: seed.material_name || "", list: "material-name-options", col: "material_name" });
+            nameInput.style.width = "320px";
+            nameInput.style.minHeight = "48px";
+            nameInput.style.whiteSpace = "normal";
+            nameInput.style.wordBreak = "break-word";
+            const codeInput = readOnlyCell(seed.material_code || "");
+            codeInput.dataset.col = "material_code";
+            const clothingSizeInput = editableCell({ value: seed.clothing_size || "", col: "clothing_size" });
+            const shoeSizeInput = editableCell({ value: seed.shoe_size || "", col: "shoe_size" });
+            const quantityInput = editableCell({ type: "number", value: seed.quantity || "", step: "0.001", min: "0", col: "quantity" });
+            const serviceLifeInput = editableCell({ type: "number", value: seed.service_life_months || "", step: "1", min: "1", col: "service_life_months" });
+
+            const fillWorker = () => {
+                const typedName = String(employeeNameInput.value || "").trim().toLowerCase();
+                const worker = workerNameIndex.get(typedName) || workerIndex.get(String(employeeInput.value || "").trim());
+                employeeNameInput.value = worker?.full_name || employeeNameInput.value;
+                employeeInput.value = worker?.employee_number || employeeInput.value;
+            };
+
+            const fillMaterial = () => {
+                const typedName = String(nameInput.value || "").trim().toLowerCase();
+                const material = materialNameIndex.get(typedName) || materialIndex.get(normalizeCode(codeInput.value));
+                nameInput.value = material?.name || nameInput.value;
+                codeInput.value = material?.code || codeInput.value;
+            };
+
+            fillWorker();
+            fillMaterial();
+            employeeInput.addEventListener("change", fillWorker);
+            employeeInput.addEventListener("blur", fillWorker);
+            employeeNameInput.addEventListener("change", fillWorker);
+            employeeNameInput.addEventListener("blur", fillWorker);
+            codeInput.addEventListener("change", fillMaterial);
+            codeInput.addEventListener("blur", fillMaterial);
+            nameInput.addEventListener("change", fillMaterial);
+            nameInput.addEventListener("blur", fillMaterial);
+
+            [employeeNameInput, employeeInput, nameInput, codeInput, quantityInput, serviceLifeInput].forEach((input) => {
+                const cell = document.createElement("td");
+                cell.appendChild(input);
+                row.appendChild(cell);
+            });
+
+            const removeCell = document.createElement("td");
+            removeCell.appendChild(createDeleteButton(row));
+            row.appendChild(removeCell);
+
+            wireRowEvents(row, () => {
+                fillWorker();
+                fillMaterial();
+                syncHiddenItems();
+            });
+
+            return row;
+        };
+
+
+        const createScheduleRow = (seed = {}) => {
+            const row = document.createElement("tr");
+
+            const workTypeInput = editableCell({ value: seed.work_type || "", col: "work_type" });
+            const stageInput = editableCell({ value: seed.stage || "", col: "stage" });
+            const executorInput = editableCell({ value: seed.executor || "", col: "executor" });
+            const startDateInput = editableCell({ type: "date", value: seed.start_date || "", col: "start_date" });
+            const endDateInput = editableCell({ type: "date", value: seed.end_date || "", col: "end_date" });
+            const notesInput = editableCell({ value: seed.notes || "", col: "notes" });
+
+            [workTypeInput, stageInput, executorInput, startDateInput, endDateInput, notesInput].forEach((input) => {
+                const cell = document.createElement("td");
+                cell.appendChild(input);
+                row.appendChild(cell);
+            });
+
+            const removeCell = document.createElement("td");
+            removeCell.appendChild(createDeleteButton(row));
+            row.appendChild(removeCell);
+
+            wireRowEvents(row, () => syncHiddenItems());
+            return row;
+        };
+
+        const createStageRow = (seed = {}) => {
+            const row = document.createElement("tr");
+            const stageInput = editableCell({ value: seed.stage_name || "", col: "stage_name" });
+            const cell = document.createElement("td");
+            cell.appendChild(stageInput);
+            row.appendChild(cell);
+            const removeCell = document.createElement("td");
+            removeCell.appendChild(createDeleteButton(row));
+            row.appendChild(removeCell);
+            wireRowEvents(row, () => syncHiddenItems());
+            return row;
+        };
+
+        const createSupplierRow = (seed = {}) => {
+            const row = document.createElement("tr");
+
+            const codeInput = editableCell({ value: seed.material_code || "", col: "material_code" });
+            codeInput.readOnly = true;
+            codeInput.className = "is-readonly";
+
+            const nameInput = editableCell({ value: seed.material_name || "", col: "material_name" });
+            nameInput.readOnly = true;
+            nameInput.className = "is-readonly";
+
+            const unitInput = editableCell({ value: seed.unit || "", col: "unit" });
+            unitInput.readOnly = true;
+            unitInput.className = "is-readonly";
+
+            const quantityInput = editableCell({ type: "number", value: seed.quantity || "", col: "quantity" });
+            quantityInput.readOnly = true;
+            quantityInput.className = "is-readonly";
+
+            const priceInput = editableCell({ type: "number", step: "0.01", min: "0", value: seed.unit_price || "", col: "unit_price" });
+            
+            const amountInput = editableCell({ type: "number", value: seed.amount || "", col: "amount" });
+            amountInput.readOnly = true;
+            amountInput.className = "is-readonly";
+
+            // Пересчёт суммы при изменении цены
+            priceInput.addEventListener("input", () => {
+                const qty = parseFloat(quantityInput.value) || 0;
+                const price = parseFloat(priceInput.value) || 0;
+                amountInput.value = (qty * price).toFixed(2);
+                syncHiddenItems();
+                // Пересчитываем итого по документу
+                const totalAmountInput = form.querySelector('input[name="amount"]');
+                if (totalAmountInput) {
+                    const total = Array.from(tableBody.querySelectorAll('input[data-col="amount"]'))
+                        .reduce((sum, el) => sum + (parseFloat(el.value) || 0), 0);
+                    totalAmountInput.value = total.toFixed(2);
+                }
+            });
+
+            [codeInput, nameInput, unitInput, quantityInput, priceInput, amountInput].forEach(input => {
+                const cell = document.createElement("td");
+                cell.appendChild(input);
+                row.appendChild(cell);
+            });
+
+            const removeCell = document.createElement("td");
+            removeCell.appendChild(createDeleteButton(row));
+            row.appendChild(removeCell);
+
+            wireRowEvents(row, () => syncHiddenItems());
+            return row;
+        };
+
+        const createRow = (seed = {}) => {
+            if (mode === "ppe-lines") return createPpeRow(seed);
+            if (mode === "schedule-lines") return createScheduleRow(seed);
+            if (mode === "stage-lines") return createStageRow(seed);
+            if (mode === "supplier-lines") return createSupplierRow(seed);
+            return createMaterialRow(seed);
+        };
+        const renderRows = () => {
+            buildHeader();
+            tableBody.innerHTML = "";
+            const rows = storedRows.length ? storedRows : [{}];
+            rows.forEach((rowData) => {
+                tableBody.appendChild(createRow(rowData));
+            });
+            syncHiddenItems(false);
+        };
+
+        addButton?.addEventListener("click", () => {
+            tableBody.appendChild(createRow({}));
+            syncHiddenItems();
+        });
+
+        clearButton?.addEventListener("click", () => {
+            tableBody.innerHTML = "";
+            tableBody.appendChild(createRow({}));
+            syncHiddenItems();
+        });
+
+        form.addEventListener("submit", () => {
+            syncHiddenItems(false);
+        });
+
+        renderRows();
+    }
+
+    form.querySelectorAll("input, select, textarea").forEach((node) => {
+        if (node.type === "hidden" || node.type === "submit" || node.type === "file") {
+            return;
+        }
+        node.addEventListener("input", scheduleSave);
+        node.addEventListener("change", scheduleSave);
+    });
+})();
+// Фильтрация документов поставщика по выбранному поставщику
+(() => {
+    const form = document.querySelector("form[data-autosave-url]");
+    if (!form) return;
+
+    const supplierSelect = form.querySelector('select[name="supplier"]');
+    const docSelect = form.querySelector('select[name="supplier_document"]');
+    if (!supplierSelect || !docSelect) return;
+
+    const filterDocs = async () => {
+        const supplierId = supplierSelect.value;
+        const currentValue = docSelect.value;
+
+        if (!supplierId) {
+            docSelect.innerHTML = "";
+            const empty = document.createElement("option");
+            empty.value = "";
+            empty.textContent = "---------";
+            docSelect.appendChild(empty);
+            return;
+        }
+
+        try {
+            const response = await fetch(`/operations/api/supplier-documents/?supplier_id=${supplierId}`);
+            const data = await response.json();
+
+            docSelect.innerHTML = "";
+            const empty = document.createElement("option");
+            empty.value = "";
+            empty.textContent = "---------";
+            docSelect.appendChild(empty);
+
+            data.documents.forEach(doc => {
+                const opt = document.createElement("option");
+                opt.value = doc.id;
+                opt.textContent = doc.label;
+                if (String(doc.id) === String(currentValue)) {
+                    opt.selected = true;
+                }
+                docSelect.appendChild(opt);
+            });
+        } catch (_err) {}
+    };
+
+    supplierSelect.addEventListener("change", filterDocs);
+
+    if (supplierSelect.value) {
+        filterDocs();
+    }
+})();
+
+// Подтягивание видов работ из договора (для журнала работ)
+(() => {
+    const form = document.querySelector("form[data-autosave-url]");
+    if (!form) return;
+
+    const contractSelect = form.querySelector('select[data-worklog-contract]');
+    // Автозаполнение графика работ из договора СМР
+(() => {
+    const form = document.querySelector("form[data-autosave-url]");
+    if (!form) return;
+
+    const contractSelect = form.querySelector('select[name="contract"]');
+    const periodStartInput = form.querySelector('input[name="period_start"]');
+    const periodEndInput = form.querySelector('input[name="period_end"]');
+    const siteNameInput = form.querySelector('input[name="site_name"]');
+    const itemsGrid = form.querySelector('[data-items-grid]');
+    if (!contractSelect || !periodStartInput || !periodEndInput) return;
+
+    const itemsHiddenInput = form.querySelector('input[name="items"][type="hidden"]');
+    if (!itemsHiddenInput || itemsHiddenInput.dataset.itemsMode !== "schedule-lines") return;
+
+    const tableBody = itemsGrid?.querySelector('[data-items-body]');
+
+    const loadFromContract = async (contractId) => {
+        if (!contractId) return;
+        try {
+            const response = await fetch(`/operations/api/contract-work-lines/?contract_id=${contractId}`);
+            const data = await response.json();
+
+            const resp2 = await fetch(`/operations/api/contract-dates/?contract_id=${contractId}`);
+            const dates = await resp2.json();
+            if (dates.start_date) periodStartInput.value = dates.start_date;
+            if (dates.end_date) periodEndInput.value = dates.end_date;
+
+            const workLines = data.work_lines || [];
+            if (!tableBody || workLines.length === 0) return;
+
+            const siteName = (siteNameInput?.value || "").trim();
+            tableBody.innerHTML = "";
+
+            for (const line of workLines) {
+                // Загружаем этапы для этого вида работ
+                const stagesResp = await fetch(`/operations/api/work-stages/?work_type=${encodeURIComponent(line.work_type)}`);
+                const stagesData = await stagesResp.json();
+                const stages = stagesData.stages || [];
+
+                if (stages.length > 0) {
+                    // Создаём строку для каждого этапа
+                    for (const stage of stages) {
+                        const row = document.createElement("tr");
+                        const fields = [
+                            { col: "work_type", value: line.work_type, type: "text" },
+                            { col: "stage", value: stage.stage_name, type: "text" },
+                            { col: "executor", value: CURRENT_USER_FULLNAME, type: "text" },
+                            { col: "start_date", value: "", type: "date" },
+                            { col: "end_date", value: "", type: "date" },
+                            { col: "notes", value: siteName, type: "text" },
+                        ];
+                        fields.forEach(({ col, value, type }) => {
+                            const cell = document.createElement("td");
+                            const input = document.createElement("input");
+                            input.type = type;
+                            input.value = value;
+                            input.dataset.col = col;
+                            cell.appendChild(input);
+                            row.appendChild(cell);
+                        });
+                        const removeCell = document.createElement("td");
+                        const removeBtn = document.createElement("button");
+                        removeBtn.type = "button";
+                        removeBtn.className = "ghost-button row-remove-button";
+                        removeBtn.textContent = "Удалить";
+                        removeBtn.addEventListener("click", () => row.remove());
+                        removeCell.appendChild(removeBtn);
+                        row.appendChild(removeCell);
+                        tableBody.appendChild(row);
+                    }
+                } else {
+                    // Если этапов нет — одна строка без этапа
+                    const row = document.createElement("tr");
+                    const fields = [
+                        { col: "work_type", value: line.work_type, type: "text" },
+                        { col: "stage", value: "", type: "text" },
+                        { col: "executor", value: CURRENT_USER_FULLNAME, type: "text" },
+                        { col: "start_date", value: "", type: "date" },
+                        { col: "end_date", value: "", type: "date" },
+                        { col: "notes", value: siteName, type: "text" },
+                    ];
+                    fields.forEach(({ col, value, type }) => {
+                        const cell = document.createElement("td");
+                        const input = document.createElement("input");
+                        input.type = type;
+                        input.value = value;
+                        input.dataset.col = col;
+                        cell.appendChild(input);
+                        row.appendChild(cell);
+                    });
+                    const removeCell = document.createElement("td");
+                    const removeBtn = document.createElement("button");
+                    removeBtn.type = "button";
+                    removeBtn.className = "ghost-button row-remove-button";
+                    removeBtn.textContent = "Удалить";
+                    removeBtn.addEventListener("click", () => row.remove());
+                    removeCell.appendChild(removeBtn);
+                    row.appendChild(removeCell);
+                    tableBody.appendChild(row);
+                }
+            }
+
+            // Обновляем скрытое поле
+            const rows = Array.from(tableBody.querySelectorAll("tr")).map(r => ({
+                work_type: r.querySelector('input[data-col="work_type"]')?.value || "",
+                stage: r.querySelector('input[data-col="stage"]')?.value || "",
+                executor: r.querySelector('input[data-col="executor"]')?.value || "",
+                start_date: r.querySelector('input[data-col="start_date"]')?.value || "",
+                end_date: r.querySelector('input[data-col="end_date"]')?.value || "",
+                notes: r.querySelector('input[data-col="notes"]')?.value || "",
+            }));
+            itemsHiddenInput.value = JSON.stringify(rows);
+
+        } catch (err) {
+            console.error("Ошибка загрузки данных договора:", err);
+        }
+    };
+
+    contractSelect.addEventListener("change", () => loadFromContract(contractSelect.value));
+    if (contractSelect.value) loadFromContract(contractSelect.value);
+})();
+    const workTypeSelect = form.querySelector('select[data-worklog-worktype]');
+    const unitInput = form.querySelector('input[data-worklog-unit]');
+    if (!contractSelect || !workTypeSelect) return;
+
+    // Сохраняем текущее значение чтобы не сбросить при первой загрузке
+    const initialWorkType = workTypeSelect.value;
+    const workLinesCache = new Map();
+
+    const loadWorkLines = async (contractId) => {
+        if (!contractId) {
+            workTypeSelect.innerHTML = '<option value="">Сначала выберите договор</option>';
+            return;
+        }
+
+        try {
+            const response = await fetch(`/operations/api/contract-work-lines/?contract_id=${contractId}`);
+            const data = await response.json();
+            const workLines = data.work_lines || [];
+
+            // Запоминаем виды работ по контракту чтобы потом подтянуть единицы
+            workLinesCache.set(contractId, workLines);
+
+            workTypeSelect.innerHTML = "";
+            
+            if (workLines.length === 0) {
+                const opt = document.createElement("option");
+                opt.value = "";
+                opt.textContent = "В договоре нет видов работ";
+                workTypeSelect.appendChild(opt);
+                return;
+            }
+
+            const empty = document.createElement("option");
+            empty.value = "";
+            empty.textContent = "Выберите вид работ";
+            workTypeSelect.appendChild(empty);
+
+            workLines.forEach(line => {
+                const opt = document.createElement("option");
+                opt.value = line.work_type;
+                opt.textContent = line.work_type;
+                opt.dataset.unit = line.unit || "";
+                opt.dataset.quantity = line.quantity || "";
+                if (line.work_type === initialWorkType) {
+                    opt.selected = true;
+                }
+                workTypeSelect.appendChild(opt);
+            });
+        } catch (_err) {}
+    };
+
+    // При смене вида работ — подставляем единицу и загружаем этапы
+workTypeSelect.addEventListener("change", () => {
+    const selected = workTypeSelect.options[workTypeSelect.selectedIndex];
+    if (selected && selected.dataset.unit && unitInput) {
+        unitInput.value = selected.dataset.unit;
+    }
+    // Подставляем плановый объём из договора
+    const planVolumeInput = form.querySelector('input[name="planned_volume"]');
+    if (planVolumeInput && selected && selected.dataset.quantity) {
+        planVolumeInput.value = selected.dataset.quantity;
+    }
+});
+
+// При смене этапа — подставляем плановую дату
+const stageSelect = form.querySelector('select[data-worklog-stage]');
+if (stageSelect) {
+    stageSelect.addEventListener("change", async () => {
+        const stageName = stageSelect.value;
+        if (!stageName) return;
+
+        const planDateInput = form.querySelector('input[name="plan_date"]');
+        const planStartInput = form.querySelector('input[name="plan_start"]');
+        const planEndInput = form.querySelector('input[name="plan_end"]');
+        if (!contractSelect?.value) return;
+
+        try {
+            const resp = await fetch(`/operations/api/schedule-stage-dates/?contract_id=${contractSelect.value}&work_type=${encodeURIComponent(workTypeSelect.value)}&stage=${encodeURIComponent(stageName)}`);
+            const data = await resp.json();
+            if (data.start_date && planDateInput) planDateInput.value = data.start_date;
+            if (data.start_date && planStartInput) planStartInput.value = data.start_date;
+            if (data.end_date && planEndInput) planEndInput.value = data.end_date;
+        } catch (_err) {}
+    });
+}
+
+    contractSelect.addEventListener("change", () => {
+        loadWorkLines(contractSelect.value);
+    });
+
+    // При загрузке страницы — если договор уже выбран, подтянем виды работ
+    if (contractSelect.value) {
+        loadWorkLines(contractSelect.value);
+    }
+})();
+
+// Фильтрация таблицы списка документов
+(() => {
+    const filterNumber = document.getElementById("doc-filter-number");
+    const filterStatus = document.getElementById("doc-filter-status");
+    const filterDateFrom = document.getElementById("doc-filter-date-from");
+    const filterDateTo = document.getElementById("doc-filter-date-to");
+    const applyBtn = document.getElementById("doc-filter-apply");
+    const tableBody = document.querySelector("#workspace-recent tbody");
+    if (!tableBody) return;
+
+    const applyFilter = () => {
+        const number = (filterNumber?.value || "").toLowerCase();
+        const status = (filterStatus?.value || "").toLowerCase();
+        const dateFrom = filterDateFrom?.value || "";
+        const dateTo = filterDateTo?.value || "";
+        tableBody.querySelectorAll("tr").forEach((row) => {
+            const text = row.textContent.toLowerCase();
+            const cells = row.querySelectorAll("td");
+            // Дата обычно во второй колонке
+            const dateCell = cells[1]?.textContent.trim() || "";
+            const showNum = !number || text.includes(number);
+            const showStatus = !status || text.includes(status);
+            const showFrom = !dateFrom || dateCell >= dateFrom;
+            const showTo = !dateTo || dateCell <= dateTo;
+            row.style.display = showNum && showStatus && showFrom && showTo ? "" : "none";
+        });
+    };
+
+    applyBtn?.addEventListener("click", applyFilter);
+})();
+
+// Подтягивание материалов (из заявки участка или из договора СМР)
+(() => {
+    const form = document.querySelector("form[data-autosave-url]");
+    if (!form) return;
+
+    const loadBtn = form.querySelector('[data-load-from-contract]');
+    const itemsHiddenInput = form.querySelector('input[name="items"][type="hidden"]');
+    const itemsGrid = form.querySelector('[data-items-grid]');
+    if (!loadBtn || !itemsHiddenInput || !itemsGrid) return;
+
+    const itemsMode = itemsHiddenInput.dataset.itemsMode || "";
+    if (itemsMode !== "material-lines-no-price" && itemsMode !== "material-lines" && itemsMode !== "procurement-lines") {
+        loadBtn.style.display = "none";
+        return;
+    }
+
+    const tableBody = itemsGrid.querySelector('[data-items-body]');
+    if (!tableBody) return;
+
+    // Динамическое название кнопки
+    const siteRequestSelect = form.querySelector('select[name="site_request"]');
+    if (siteRequestSelect) {
+        loadBtn.textContent = "Загрузить из заявки участка";
+    } else {
+        loadBtn.textContent = "Загрузить из договора СМР";
+    }
+
+    loadBtn.addEventListener("click", async () => {
+        if (siteRequestSelect && siteRequestSelect.value) {
+            try {
+                const response = await fetch(`/operations/api/site-request-materials/?request_id=${siteRequestSelect.value}`);
+                const data = await response.json();
+                const materials = data.materials || [];
+                if (materials.length === 0) {
+                    alert("По выбранной заявке не найдено материалов.");
+                    return;
+                }
+
+                // Загружаем цены из счёта через цепочку заявок
+                let priceIndex = {};
+                try {
+                    const priceResp = await fetch(`/operations/api/invoice-prices-by-site-request/?request_id=${siteRequestSelect.value}`);
+                    const priceData = await priceResp.json();
+                    priceIndex = priceData.prices || {};
+                } catch (_e) {}
+
+                tableBody.innerHTML = "";
+                materials.forEach(m => {
+                    const invoicePrice = priceIndex[m.material_code] || m.unit_price || "";
+                    const row = document.createElement("tr");
+                    const fields = [
+                        { col: "material_code", value: m.material_code, list: "material-code-options" },
+                        { col: "material_name", value: m.material_name, readonly: true },
+                        { col: "unit", value: m.unit, readonly: true },
+                        { col: "quantity", value: m.quantity, type: "number" },
+                       // { col: "unit_price", value: priceIndex[m.material_code] || m.unit_price || "", type: "number", readonly: true },
+                        { col: "notes", value: m.notes || "" },
+                    ];
+                    fields.forEach(({ col, value, readonly, type = "text", list }) => {
+                        const cell = document.createElement("td");
+                        const input = document.createElement("input");
+                        input.type = type;
+                        input.value = value || "";
+                        input.dataset.col = col;
+                        if (readonly) { input.readOnly = true; input.className = "is-readonly"; }
+                        if (list) input.setAttribute("list", list);
+                        cell.appendChild(input);
+                        row.appendChild(cell);
+                    });
+                    const removeCell = document.createElement("td");
+                    const removeBtn = document.createElement("button");
+                    removeBtn.type = "button";
+                    removeBtn.className = "ghost-button row-remove-button";
+                    removeBtn.textContent = "Удалить";
+                    removeBtn.addEventListener("click", () => row.remove());
+                    removeCell.appendChild(removeBtn);
+                    row.appendChild(removeCell);
+                    tableBody.appendChild(row);
+                });
+
+                itemsHiddenInput.value = JSON.stringify(materials.map(m => ({
+                    material_code: m.material_code,
+                    quantity: m.quantity,
+                    unit_price: priceIndex[m.material_code] || m.unit_price || "0",
+                    notes: m.notes || "",
+                    reserve: m.reserve || "0",
+                })));
+
+                alert(`Загружено материалов: ${materials.length}.`);
+                return;
+            } catch (err) {
+                console.error("Ошибка загрузки из заявки:", err);
+                alert("Ошибка загрузки материалов.");
+                return;
+            }
+        }
+
+        // Иначе — из договора СМР
+        let contractSelect = form.querySelector('select[name="contract"]')
+            || form.querySelector('[name="contract"]');
+
+        if (!contractSelect || !contractSelect.value) {
+            alert("Сначала выберите заявку участка или договор СМР.");
+            return;
+        }
+
+        const contractId = contractSelect.value;
+
+        try {
+            const response = await fetch(`/operations/api/contract-materials/?contract_id=${contractId}`);
+            const data = await response.json();
+            const materials = data.materials || [];
+
+            if (materials.length === 0) {
+                alert("По выбранному договору не найдено материалов по нормам расхода.");
+                return;
+            }
+
+            itemsHiddenInput.value = JSON.stringify(materials.map(m => ({
+                material_code: m.material_code,
+                quantity: m.quantity,
+                unit_price: m.unit_price || "0",
+                notes: m.notes || "",
+                reserve: m.reserve || "0",
+            })));
+
+            tableBody.innerHTML = "";
+            materials.forEach(m => {
+                const row = document.createElement("tr");
+
+                const codeCell = document.createElement("td");
+                const codeInput = document.createElement("input");
+                codeInput.type = "text";
+                codeInput.value = m.material_code;
+                codeInput.dataset.col = "material_code";
+                codeInput.setAttribute("list", "material-code-options");
+                codeCell.appendChild(codeInput);
+                row.appendChild(codeCell);
+
+                const nameCell = document.createElement("td");
+                const nameInput = document.createElement("input");
+                nameInput.type = "text";
+                nameInput.value = m.material_name;
+                nameInput.readOnly = true;
+                nameInput.className = "is-readonly";
+                nameCell.appendChild(nameInput);
+                row.appendChild(nameCell);
+
+                const unitCell = document.createElement("td");
+                const unitInputEl = document.createElement("input");
+                unitInputEl.type = "text";
+                unitInputEl.value = m.unit;
+                unitInputEl.readOnly = true;
+                unitInputEl.className = "is-readonly";
+                unitCell.appendChild(unitInputEl);
+                row.appendChild(unitCell);
+
+                const qtyContractCell = document.createElement("td");
+                const qtyContractInput = document.createElement("input");
+                qtyContractInput.type = "number";
+                qtyContractInput.value = m.qty_by_contract;
+                qtyContractInput.readOnly = true;
+                qtyContractInput.className = "is-readonly";
+                qtyContractCell.appendChild(qtyContractInput);
+                row.appendChild(qtyContractCell);
+
+                const reserveCell = document.createElement("td");
+                const reserveInput = document.createElement("input");
+                reserveInput.type = "number";
+                reserveInput.step = "1";
+                reserveInput.min = "0";
+                reserveInput.value = m.reserve;
+                reserveInput.dataset.col = "reserve";
+                reserveCell.appendChild(reserveInput);
+                row.appendChild(reserveCell);
+
+                const qtyCell = document.createElement("td");
+                const qtyInput = document.createElement("input");
+                qtyInput.type = "number";
+                qtyInput.step = "1";
+                qtyInput.min = "0";
+                qtyInput.value = m.quantity;
+                qtyInput.dataset.col = "quantity";
+                qtyCell.appendChild(qtyInput);
+                row.appendChild(qtyCell);
+
+                reserveInput.addEventListener("input", () => {
+                    const contract = parseFloat(qtyContractInput.value) || 0;
+                    const reserve = parseFloat(reserveInput.value) || 0;
+                    qtyInput.value = (contract + reserve).toFixed(0);
+                });
+
+                if (itemsMode === "material-lines") {
+                    const priceCell = document.createElement("td");
+                    const priceInput = document.createElement("input");
+                    priceInput.type = "number";
+                    priceInput.step = "0.01";
+                    priceInput.min = "0";
+                    priceInput.value = m.unit_price;
+                    priceInput.dataset.col = "unit_price";
+                    priceCell.appendChild(priceInput);
+                    row.appendChild(priceCell);
+                }
+
+                const notesCell = document.createElement("td");
+                const notesInput = document.createElement("input");
+                notesInput.type = "text";
+                notesInput.value = m.notes;
+                notesInput.dataset.col = "notes";
+                notesCell.appendChild(notesInput);
+                row.appendChild(notesCell);
+
+                const removeCell = document.createElement("td");
+                const removeBtn = document.createElement("button");
+                removeBtn.type = "button";
+                removeBtn.className = "ghost-button row-remove-button";
+                removeBtn.textContent = "Удалить";
+                removeBtn.addEventListener("click", () => {
+                    row.remove();
+                    const remainingRows = Array.from(tableBody.querySelectorAll("tr")).map(r => ({
+                        material_code: r.querySelector('input[data-col="material_code"]')?.value || "",
+                        quantity: r.querySelector('input[data-col="quantity"]')?.value || "",
+                        unit_price: r.querySelector('input[data-col="unit_price"]')?.value || "",
+                        notes: r.querySelector('input[data-col="notes"]')?.value || "",
+                        reserve: r.querySelector('input[data-col="reserve"]')?.value || "0",
+                    }));
+                    itemsHiddenInput.value = JSON.stringify(remainingRows);
+                });
+                removeCell.appendChild(removeBtn);
+                row.appendChild(removeCell);
+
+                tableBody.appendChild(row);
+            });
+
+            alert(`Загружено материалов: ${materials.length}. Проверьте данные и нажмите "Создать".`);
+        } catch (err) {
+            console.error("Ошибка:", err);
+            alert("Ошибка загрузки: " + err.message);
+        }
+    });
+})();
+// Подтягивание материалов из документа поставщика (для прихода на склад)
+(() => {
+    const form = document.querySelector("form[data-autosave-url]");
+    if (!form) return;
+
+    const docSelect = form.querySelector('select[name="supplier_document"]');
+    const itemsHiddenInput = form.querySelector('input[name="items"][type="hidden"]');
+    const itemsGrid = form.querySelector('[data-items-grid]');
+    if (!docSelect || !itemsHiddenInput || !itemsGrid) return;
+
+    const tableBody = itemsGrid.querySelector('[data-items-body]');
+    if (!tableBody) return;
+
+    const loadMaterialsFromDoc = async () => {
+        const docId = docSelect.value;
+        if (!docId) return;
+
+        try {
+            const response = await fetch(`/operations/api/supplier-document-materials/?doc_id=${docId}`);
+            const data = await response.json();
+            const materials = data.materials || [];
+            
+            if (materials.length === 0) return;
+
+            itemsHiddenInput.value = JSON.stringify(materials.map(m => ({
+                material_code: m.material_code,
+                quantity: m.quantity,
+                unit_price: m.unit_price,
+                notes: m.notes,
+            })));
+
+            tableBody.innerHTML = "";
+            materials.forEach(m => {
+                const row = document.createElement("tr");
+                
+                const codeCell = document.createElement("td");
+                const codeInput = document.createElement("input");
+                codeInput.type = "text";
+                codeInput.value = m.material_code;
+                codeInput.dataset.col = "material_code";
+                codeCell.appendChild(codeInput);
+                row.appendChild(codeCell);
+
+                const nameCell = document.createElement("td");
+                const nameInput = document.createElement("input");
+                nameInput.type = "text";
+                nameInput.value = m.material_name;
+                nameInput.readOnly = true;
+                nameInput.className = "is-readonly";
+                nameCell.appendChild(nameInput);
+                row.appendChild(nameCell);
+
+                const unitCell = document.createElement("td");
+                const unitInput = document.createElement("input");
+                unitInput.type = "text";
+                unitInput.value = m.unit;
+                unitInput.readOnly = true;
+                unitInput.className = "is-readonly";
+                unitCell.appendChild(unitInput);
+                row.appendChild(unitCell);
+
+                const qtyCell = document.createElement("td");
+                const qtyInput = document.createElement("input");
+                qtyInput.type = "number";
+                qtyInput.step = "0.001";
+                qtyInput.min = "0";
+                qtyInput.value = m.quantity;
+                qtyInput.dataset.col = "quantity";
+                qtyCell.appendChild(qtyInput);
+                row.appendChild(qtyCell);
+
+                const priceCell = document.createElement("td");
+                const priceInput = document.createElement("input");
+                priceInput.type = "number";
+                priceInput.step = "0.01";
+                priceInput.min = "0";
+                priceInput.value = m.unit_price;
+                priceInput.dataset.col = "unit_price";
+                priceCell.appendChild(priceInput);
+                row.appendChild(priceCell);
+
+                const notesCell = document.createElement("td");
+                const notesInput = document.createElement("input");
+                notesInput.type = "text";
+                notesInput.value = m.notes;
+                notesInput.dataset.col = "notes";
+                notesCell.appendChild(notesInput);
+                row.appendChild(notesCell);
+
+                const removeCell = document.createElement("td");
+                const removeBtn = document.createElement("button");
+                removeBtn.type = "button";
+                removeBtn.className = "ghost-button row-remove-button";
+                removeBtn.textContent = "Удалить";
+                removeBtn.addEventListener("click", () => row.remove());
+                removeCell.appendChild(removeBtn);
+                row.appendChild(removeCell);
+
+                tableBody.appendChild(row);
+            });
+        } catch (err) {
+            console.error("Ошибка загрузки материалов:", err);
+        }
+    };
+
+    docSelect.addEventListener("change", loadMaterialsFromDoc);
+})();
+// Подтягивание материалов из заявки для документа поставщика
+(() => {
+    const form = document.querySelector("form[data-autosave-url]");
+    if (!form) return;
+
+    const requestSelect = form.querySelector('select[name="request"]');
+    const itemsHiddenInput = form.querySelector('input[name="items"][type="hidden"]');
+    if (!requestSelect || !itemsHiddenInput || itemsHiddenInput.dataset.itemsMode !== "supplier-lines") return;
+
+    const itemsGrid = form.querySelector('[data-items-grid]');
+    const tableBody = itemsGrid?.querySelector('[data-items-body]');
+    if (!tableBody) return;
+
+    const loadFromRequest = async (requestId) => {
+        if (!requestId) return;
+        try {
+            const resp = await fetch(`/operations/api/procurement-request-materials/?request_id=${requestId}`);
+            const data = await resp.json();
+            const materials = data.materials || [];
+            if (materials.length === 0) return;
+
+            // --- НОВОЕ: загружаем цены из счёта ---
+            let priceIndex = {};
+            try {
+                const priceResp = await fetch(`/operations/api/invoice-prices/?request_id=${requestId}`);
+                const priceData = await priceResp.json();
+                // --- подставляем ставку НДС из счёта ---
+                priceIndex = priceData.prices || {};
+                if (priceData.vat_rate) {
+                    const vatInput = form.querySelector('input[name="vat_rate"]');
+                    if (vatInput) vatInput.value = priceData.vat_rate;
+                }
+                // ---------------------------------------
+            } catch (_e) {}
+
+            tableBody.innerHTML = "";
+            materials.forEach(m => {
+                const row = document.createElement("tr");
+                // Цена из счёта если есть, иначе пусто
+                const invoicePrice = priceIndex[m.material_code] || "";
+                const fields = [
+                    { col: "material_code", value: m.material_code, readonly: true },
+                    { col: "material_name", value: m.material_name, readonly: true },
+                    { col: "unit", value: m.unit, readonly: true },
+                    { col: "quantity", value: m.quantity, readonly: true, type: "number" },
+                    { col: "unit_price", value: invoicePrice, readonly: false, type: "number" },
+                    { col: "amount", value: invoicePrice
+                        ? (parseFloat(m.quantity) * parseFloat(invoicePrice)).toFixed(2)
+                        : "", readonly: true, type: "number" },
+                ];
+                fields.forEach(({ col, value, readonly, type = "text" }) => {
+                    const cell = document.createElement("td");
+                    const input = document.createElement("input");
+                    input.type = type;
+                    input.value = value;
+                    input.dataset.col = col;
+                    if (readonly) {
+                        input.readOnly = true;
+                        input.className = "is-readonly";
+                    }
+                    if (col === "unit_price") {
+                        input.step = "0.01";
+                        input.min = "0";
+                        input.addEventListener("input", () => {
+                            const qty = parseFloat(row.querySelector('[data-col="quantity"]')?.value) || 0;
+                            const price = parseFloat(input.value) || 0;
+                            const amountInput = row.querySelector('[data-col="amount"]');
+                            if (amountInput) amountInput.value = (qty * price).toFixed(2);
+                            const totalInput = form.querySelector('input[name="amount"]');
+                            if (totalInput) {
+                                const total = Array.from(tableBody.querySelectorAll('[data-col="amount"]'))
+                                    .reduce((s, el) => s + (parseFloat(el.value) || 0), 0);
+                                totalInput.value = total.toFixed(2);
+                            }
+                        });
+                    }
+                    cell.appendChild(input);
+                    row.appendChild(cell);
+                });
+                tableBody.appendChild(row);
+            });
+
+            // Пересчёт итого после загрузки всех строк
+            const totalInput = form.querySelector('input[name="amount"]');
+            if (totalInput) {
+                const total = Array.from(tableBody.querySelectorAll('[data-col="amount"]'))
+                    .reduce((s, el) => s + (parseFloat(el.value) || 0), 0);
+                if (total > 0) totalInput.value = total.toFixed(2);
+            }
+
+        } catch (err) {
+            console.error("Ошибка загрузки материалов:", err);
+        }
+    };
+
+    requestSelect.addEventListener("change", () => loadFromRequest(requestSelect.value));
+    if (requestSelect.value) loadFromRequest(requestSelect.value);
+})();
+
+(() => {
+    const form = document.querySelector("form[data-autosave-url]");
+    if (!form) return;
+    const siteSelect = form.querySelector('select[name="site_name"]');
+    const requestSelect = form.querySelector('select[name="site_request"]');
+    if (!siteSelect || !requestSelect) return;
+
+    const filterRequests = async () => {
+        const siteName = siteSelect.value;
+        const currentValue = requestSelect.value;
+        try {
+            const resp = await fetch(`/operations/api/site-requests-by-site/?site_name=${encodeURIComponent(siteName)}`);
+            const data = await resp.json();
+            requestSelect.innerHTML = "";
+            const empty = document.createElement("option");
+            empty.value = "";
+            empty.textContent = "Не выбрано";
+            requestSelect.appendChild(empty);
+            data.requests.forEach(r => {
+                const opt = document.createElement("option");
+                opt.value = r.id;
+                opt.textContent = r.label;
+                if (String(r.id) === String(currentValue)) opt.selected = true;
+                requestSelect.appendChild(opt);
+            });
+        } catch (_err) {}
+    };
+
+    siteSelect.addEventListener("change", filterRequests);
+    if (siteSelect.value) filterRequests();
+})();
+// Автоподстановка получателя при выборе участка
+(() => {
+    const form = document.querySelector("form[data-autosave-url]");
+    if (!form) return;
+
+    const siteSelect = form.querySelector('select[name="site_name"]');
+    const receiverSelect = form.querySelector('select[name="received_by_user"]');
+    if (!siteSelect || !receiverSelect) return;
+
+    const loadManager = async (siteName) => {
+        if (!siteName) return;
+        try {
+            const resp = await fetch(`/operations/api/site-manager-by-site/?site_name=${encodeURIComponent(siteName)}`);
+            const data = await resp.json();
+            if (data.user_id) {
+                receiverSelect.value = data.user_id;
+            }
+        } catch (_err) {}
+    };
+
+    siteSelect.addEventListener("change", () => loadManager(siteSelect.value));
+    if (siteSelect.value) loadManager(siteSelect.value);    
+})();
+// Автозаполнение акта сдачи-приёмки из договора СМР
+(() => {
+    const form = document.querySelector("form[data-autosave-url]");
+    if (!form) return;
+
+    const contractSelect = form.querySelector('select[name="contract"]');
+    if (!contractSelect) return;
+
+    // Проверяем что это форма акта сдачи-приёмки
+    const workDescInput = form.querySelector('textarea[name="work_description"]');
+    const volumeInput = form.querySelector('input[name="accepted_volume"]');
+    const unitInput = form.querySelector('input[name="volume_unit"]');
+    const amountInput = form.querySelector('input[name="amount"]');
+    const siteNameInput = form.querySelector('input[name="site_name"]');
+    if (!workDescInput) return;
+
+    const loadFromContract = async (contractId) => {
+        if (!contractId) return;
+        try {
+            const resp = await fetch(`/operations/api/contract-work-lines/?contract_id=${contractId}`);
+            const data = await resp.json();
+
+            const resp2 = await fetch(`/operations/api/contract-dates/?contract_id=${contractId}`);
+            const dates = await resp2.json();
+
+            // Подтягиваем данные договора через отдельный эндпоинт
+            const resp3 = await fetch(`/operations/api/contract-details/?contract_id=${contractId}`);
+            const details = await resp3.json();
+
+            if (details.subject && !workDescInput.value) {
+                workDescInput.value = details.subject;
+            }
+            if (details.planned_volume && volumeInput && !volumeInput.value) {
+                volumeInput.value = details.planned_volume;
+            }
+            if (details.volume_unit && unitInput && !unitInput.value) {
+                unitInput.value = details.volume_unit;
+            }
+            if (details.amount && amountInput && !amountInput.value) {
+                amountInput.value = details.amount;
+            }
+            if (details.object_name && siteNameInput && !siteNameInput.value) {
+                siteNameInput.value = details.object_name;
+            }
+        } catch (err) {
+            console.error("Ошибка загрузки данных договора:", err);
+        }
+    };
+
+    contractSelect.addEventListener("change", () => loadFromContract(contractSelect.value));
+    if (contractSelect.value) loadFromContract(contractSelect.value);
+})();
+</script>
+{% endblock %}

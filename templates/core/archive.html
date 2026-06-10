@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<section class="workspace-shell" data-workspace-tabs data-default-workspace="list">
+    <div class="workspace-switcher" role="list" aria-label="{% if is_archive %}Выбор рабочей области архива{% else %}Выбор рабочей области документов{% endif %}">
+        <button type="button" class="workspace-choice" data-workspace-trigger="filters" aria-controls="workspace-document-filters" aria-pressed="false">
+            <span class="workspace-choice-icon" aria-hidden="true"><svg class="bi"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#funnel"></use></svg></span>
+            <span class="workspace-choice-copy">
+                <strong>{% if is_archive %}Фильтры архива{% else %}Фильтры документов{% endif %}</strong>
+                <span>Настроить отбор по типу, статусу, датам, контрагенту или объекту</span>
+            </span>
+        </button>
+        <button type="button" class="workspace-choice" data-workspace-trigger="list" aria-controls="workspace-document-list" aria-pressed="false">
+            <span class="workspace-choice-icon" aria-hidden="true"><svg class="bi"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#journal-text"></use></svg></span>
+            <span class="workspace-choice-copy">
+                <strong>{% if is_archive %}Архив документов{% else %}Документы{% endif %}</strong>
+                <span>Открыть таблицу документов на всю рабочую область</span>
+            </span>
+        </button>
+    </div>
+
+    <div class="workspace-empty" data-workspace-empty>
+        Выберите рабочую область: фильтры или список документов.
+    </div>
+
+    <div class="workspace-panels">
+        <article class="panel workspace-panel" id="workspace-document-filters" data-workspace-panel="filters" hidden>
+            <div class="panel-head">
+                <h3>{% if is_archive %}Фильтры архива{% else %}Фильтры документов{% endif %}</h3>
+            </div>
+            {% if is_archive %}
+                <p class="field-help">В архив попадают только документы со статусом «Принят» и датой не позже текущей.</p>
+            {% else %}
+                <p class="field-help">Здесь находятся документы, которые еще проходят согласование, проверку или передачу в бухгалтерию.</p>
+            {% endif %}
+            <form method="get" class="filter-grid">
+                {% for field in form %}
+                    <div class="field">
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                    </div>
+                {% endfor %}
+                <button type="submit" class="primary-button">Применить</button>
+            </form>
+        </article>
+
+        <article class="panel panel-wide workspace-panel" id="workspace-document-list" data-workspace-panel="list" hidden>
+            <div class="panel-head">
+                <div class="panel-title-row">
+                    <h3>{% if is_archive %}Архив документов{% else %}Документы{% endif %}</h3>
+                </div>
+                {% if can_bulk_send_to_accounting %}
+                    <div class="panel-actions">
+                        <form method="post" id="bulk-accounting-form" class="inline-form">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="bulk_send_accounting">
+                            <button type="submit" class="primary-button" aria-label="Пакетная отправка в бухгалтерию" title="Пакетная отправка в бухгалтерию">Пакетная отправка</button>
+                        </form>
+                    </div>
+                {% endif %}
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            {% if can_bulk_send_to_accounting %}
+                                <th>
+                                    <input class="checkbox-input" type="checkbox" data-bulk-accounting-toggle aria-label="Выбрать все доступные документы">
+                                </th>
+                            {% endif %}
+                            <th>Тип</th>
+                            <th>Номер</th>
+                            <th>Дата</th>
+                            <th>Контрагент</th>
+                            <th>Объект</th>
+                            <th>Статус</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for record in records %}
+                            <tr>
+                                {% if can_bulk_send_to_accounting %}
+                                    <td>
+                                        {% if record.can_send_to_accounting %}
+                                            <input class="checkbox-input" type="checkbox" name="record_ids" value="{{ record.id }}" form="bulk-accounting-form" data-bulk-accounting-item aria-label="Выбрать документ {{ record.doc_number }}">
+                                        {% endif %}
+                                    </td>
+                                {% endif %}
+                                <td>{{ record.doc_type }}</td>
+                                <td>{{ record.doc_number }}</td>
+                                <td>{{ record.doc_date }}</td>
+                                <td>{{ record.counterparty }}</td>
+                                <td>{{ record.object_name }}</td>
+                                <td>{{ record.display_status|default:record.get_status_display }}</td>
+                                <td>
+                                    <div class="action-row">
+                                        <a class="ghost-button" href="{% url 'export-document' record.entity_type record.entity_id %}">Выгрузить</a>
+                                        {% if record.estimate_url %}
+                                            <a class="ghost-button" href="{{ record.estimate_url }}" target="_blank">Смета</a>
+                                        {% endif %}
+                                        {% if record.scan_url %}
+                                            <a class="ghost-button" href="{{ record.scan_url }}" target="_blank">Открыть скан</a>
+                                        {% endif %}
+                                        {% if record.schedule_scan_url %}
+                                            <a class="ghost-button" href="{{ record.schedule_scan_url }}" target="_blank">Скан графика</a>
+                                        {% endif %}
+                                        {# Кнопка просмотра платёжного поручения (видна всем у кого есть доступ к документу) #}
+                                        {% if record.payment_order_url %}
+                                            <a class="ghost-button" href="{{ record.payment_order_url }}" target="_blank">Платёжка</a>
+                                        {% endif %}
+                                        {% if record.can_edit_draft and record.rework_edit_url %}
+                                            <a class="secondary-button" href="{{ record.rework_edit_url }}">Изменить</a>
+                                        {% elif record.rework_edit_url and not record.can_edit_draft %}
+                                            <a class="secondary-button" href="{{ record.rework_edit_url }}">Доработать</a>
+                                        {% endif %}
+                                        {% if record.can_update_status %}
+                                            {# enctype нужен для загрузки файла платёжки #}
+                                            <form method="post" enctype="multipart/form-data" class="inline-form" data-status-form>
+                                                {% csrf_token %}
+                                                <input type="hidden" name="record_id" value="{{ record.id }}">
+                                                <select name="new_status" class="form-input compact-input" data-status-select>
+                                                    {% for value, label in record.available_status_choices %}
+                                                        <option value="{{ value }}" {% if value == record.status %}selected{% endif %}>{{ label }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                                <textarea name="rework_reason" class="form-input compact-input rework-reason-input" rows="2" placeholder="Причина возврата" data-rework-reason hidden></textarea>
+                                                {% if record.entity_type == "supplier_document" %}
+                                                    {% with doc_type_lower=record.doc_type|lower %}
+                                                    {% if "счет" in doc_type_lower or "счёт" in doc_type_lower %}
+                                                    <div class="payment-order-field" data-payment-order-field hidden>
+                                                        <label class="field-label" style="font-size:0.85em;margin-top:4px;display:block;">
+                                                            Платёжное поручение <span style="color:var(--color-danger)">*</span>
+                                                        </label>
+                                                        <input type="file"
+                                                            name="payment_order"
+                                                            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                                                            class="form-input compact-input"
+                                                            data-payment-order-input>
+                                                        <span class="field-help" style="font-size:0.8em;">
+                                                            PDF, изображение или документ Word
+                                                        </span>
+                                                    </div>
+                                                    {% endif %}
+                                                    {% endwith %}
+                                                {% endif %}
+                                                <button type="submit" class="secondary-button">Обновить</button>
+                                            </form>
+                                        {% elif not is_archive %}
+                                            <span class="field-help">Нет доступных переходов</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr><td colspan="{% if can_bulk_send_to_accounting %}8{% else %}7{% endif %}">По выбранным фильтрам ничего не найдено.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </article>
+    </div>
+</section>
+
+{% if can_manage_status and not is_archive %}
+<script>
+(() => {
+
+    document.querySelectorAll("[data-status-form]").forEach((form) => {
+        const select = form.querySelector("[data-status-select]");
+        const reason = form.querySelector("[data-rework-reason]");
+        const paymentOrderField = form.querySelector("[data-payment-order-field]");
+        const paymentOrderInput = form.querySelector("[data-payment-order-input]");
+
+        if (!select) return;
+
+        const syncFields = () => {
+            const selectedValue = select.value;
+
+            // Причина возврата
+            if (reason) {
+                const needsReason = selectedValue === "{{ rework_status }}";
+                reason.hidden = !needsReason;
+                reason.required = needsReason;
+                if (!needsReason) reason.value = "";
+            }
+
+            // Платёжное поручение — показываем только при переходе в sent_accounting
+            if (paymentOrderField && paymentOrderInput) {
+                const needsPayment = selectedValue === "approved";
+                paymentOrderField.hidden = !needsPayment;
+                paymentOrderInput.required = needsPayment;
+                if (!needsPayment) paymentOrderInput.value = "";
+            }
+        };
+
+        select.addEventListener("change", syncFields);
+        syncFields();
+    });
+})();
+</script>
+{% endif %}
+{% if can_bulk_send_to_accounting %}
+<script>
+(() => {
+    const toggle = document.querySelector("[data-bulk-accounting-toggle]");
+    const items = Array.from(document.querySelectorAll("[data-bulk-accounting-item]"));
+    if (!toggle || !items.length) return;
+
+    const syncToggle = () => {
+        const checkedCount = items.filter((item) => item.checked).length;
+        toggle.checked = checkedCount === items.length;
+        toggle.indeterminate = checkedCount > 0 && checkedCount < items.length;
+    };
+
+    toggle.addEventListener("click", () => {
+        items.forEach((item) => {
+            item.checked = toggle.checked;
+        });
+        syncToggle();
+    });
+    items.forEach((item) => item.addEventListener("change", syncToggle));
+    syncToggle();
+})();
+</script>
+{% endif %}
+{% endblock %}
