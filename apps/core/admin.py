@@ -34,6 +34,7 @@ from .models import (
     WriteOffAct,
     WriteOffLine,
     WorkStage,
+    FormDraft
 )
 
 
@@ -234,3 +235,9 @@ class WorkStageAdmin(admin.ModelAdmin):
     search_fields = ("work_type", "stage_name")
     list_filter = ("work_type",)
     ordering = ("work_type", "order")
+
+@admin.register(FormDraft)
+class FormDraftAdmin(admin.ModelAdmin):
+    list_display = ("user", "operation_slug", "updated_at")
+    list_filter = ("operation_slug",)
+    search_fields = ("user__username", "operation_slug")

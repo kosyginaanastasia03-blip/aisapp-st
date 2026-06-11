@@ -2424,10 +2424,22 @@ def site_requests_by_site_json(request: HttpRequest) -> JsonResponse:
     site_name = request.GET.get("site_name", "").strip()
     if not site_name:
         return JsonResponse({"requests": []})
+
+    # Заявки участка которые уже использованы в отпусках на утверждении или выше
+    busy_request_ids = StockIssue.objects.filter(
+        status__in=[
+            DocumentStatus.APPROVAL,
+            DocumentStatus.APPROVED,
+            DocumentStatus.SENT_ACCOUNTING,
+            DocumentStatus.ACCEPTED,
+        ]
+    ).exclude(site_request=None).values_list("site_request_id", flat=True)
+
     qs = SiteMaterialRequest.objects.filter(
         status__in=[DocumentStatus.ACCEPTED],
         site_name__iexact=site_name,
-    ).order_by("-request_date")
+    ).exclude(id__in=busy_request_ids).order_by("-request_date")
+
     return JsonResponse({
         "requests": [{"id": r.pk, "label": str(r)} for r in qs]
     })

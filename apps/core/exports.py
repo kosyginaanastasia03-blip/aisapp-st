@@ -461,25 +461,6 @@ class Exporter:
         }
         if entity_type not in handlers:
             raise ValueError("Для этого типа документа выгрузка не реализована.")
-        model_map = {
-            "supply_contract": "SupplyContract",
-            "stock_receipt": "StockReceipt",
-            "stock_issue": "StockIssue",
-            "write_off": "WriteOffAct",
-            "ppe_issuance": "PPEIssuance",
-            "work_acceptance": "WorkAcceptanceAct",
-            "procurement_request": "ProcurementRequest",
-            "primary_document": "PrimaryDocument",
-        }
-        if entity_type in model_map:
-            from django.apps import apps
-            model = apps.get_model("core", model_map[entity_type])
-            try:
-                instance = model.objects.get(pk=entity_id)
-                if instance.attachment and Path(instance.attachment.path).exists():
-                    return Path(instance.attachment.path)
-            except model.DoesNotExist:
-                pass
         path = handlers[entity_type](entity_id)
         DocumentRecord.objects.filter(entity_type=entity_type, entity_id=entity_id).update(file_path=str(path))
         return path
@@ -1558,8 +1539,6 @@ class Exporter:
  
     def _export_supplier_document(self, entity_id: int) -> Path:
         item = SupplierDocument.objects.select_related("supplier", "request", "supply_contract").get(pk=entity_id)
-        if item.attachment and Path(item.attachment.path).exists():
-            return Path(item.attachment.path)
         path = self._doc_path("supplier_document", item.doc_number)
         template_name = self._supplier_document_template_name(item.doc_type)
         lines_data = []
