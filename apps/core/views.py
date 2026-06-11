@@ -1402,10 +1402,8 @@ def operation_page(request: HttpRequest, slug: str) -> HttpResponse:
         raise PermissionDenied("Для вашей роли доработка этого документа через форму недоступна.")
     if is_rework_edit:
         initial = {**initial, **_operation_initial_from_instance(config["entity_type"], rework_instance, request.user)}
-    elif request.method == "GET":
-        draft_payload = load_operation_draft(user=request.user, operation_slug=slug)
-        if draft_payload:
-            initial = {**initial, **draft_payload}
+      # Черновики не подгружаются — форма всегда открывается чистой
+    draft_payload = {}
     form = config["form_class"](
         request.POST or None,
         request.FILES or None,

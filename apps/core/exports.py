@@ -1185,8 +1185,6 @@ class Exporter:
  
     def _export_procurement_request(self, entity_id: int) -> Path:
         request = ProcurementRequest.objects.select_related("contract", "site_request", "supplier", "requested_by").prefetch_related("lines__material").get(pk=entity_id)
-        requester_name = request.requested_by.full_name_or_username if request.requested_by_id else ""
-        requester_short = self._short_name(requester_name) if requester_name else "________________"
         doc = self._prepare_doc("ЗАЯВКА НА ЗАКУПКУ МАТЕРИАЛОВ", f"№ {request.number} от {request.request_date}")
         self._add_meta(doc, [
             ("Участок", request.site_name),
@@ -1208,11 +1206,6 @@ class Exporter:
                 ]
                 for line in request.lines.all()
             ],
-        )
-        self._add_signature(
-            doc,
-            f"Начальник участка / снабженец\n\n_____________________\n{requester_short}",
-            "Начальник монтажного объекта\n\n_____________________\n________________"
         )
         path = self._doc_path("procurement_request", request.number)
         doc.save(path)
@@ -1607,10 +1600,26 @@ class Exporter:
                     "AMOUNT_WITH_VAT": money(line_amount),
                 })
         if template_name:
+            from .models import User, RoleChoices
+            _warehouse_user = User.objects.filter(role=RoleChoices.WAREHOUSE, is_active=True).first()
+            _warehouse_short = self._short_name(_warehouse_user.full_name_or_username) if _warehouse_user else ""
+
             supplier_requisites = self._supplier_requisites(item.supplier) or "-"
             buyer_name = self._organization_name() or "-"
             buyer_requisites = self._organization_requisites() or "-"
             uploaded_by_name = item.uploaded_by.full_name_or_username if item.uploaded_by_id else ""
+
+            # Определяем подписантов в зависимости от типа документа
+            _supplier_signer = self._short_name(item.supplier.contact_person) if item.supplier.contact_person else item.supplier.name
+            if "наклад" in normalized_doc_type or "упд" in normalized_doc_type:
+                # Товарная накладная / УПД: отпуск разрешил поставщик, получил кладовщик
+                _left_signer = _supplier_signer
+                _right_signer = _warehouse_short
+            else:
+                # Счёт / счёт-фактура: оба подписанта со стороны поставщика
+                _left_signer = _supplier_signer
+                _right_signer = self._short_name(uploaded_by_name) if uploaded_by_name else _supplier_signer
+
             context = {
                 **self._template_common_context(),
                 "INVOICE_NUMBER": item.doc_number,
@@ -1648,8 +1657,8 @@ class Exporter:
                 "VAT_RATE": "20",
                 "BASIS_DOCUMENT": item.request.number if item.request else "",
                 "ITEMS_COUNT": len(lines_data),
-                "LEFT_SIGNER_NAME": self._short_name(item.supplier.contact_person) if item.supplier.contact_person else item.supplier.name,
-                "RIGHT_SIGNER_NAME": self._short_name(uploaded_by_name) if uploaded_by_name else "",
+                "LEFT_SIGNER_NAME": _left_signer,
+                "RIGHT_SIGNER_NAME": _right_signer,
             }
             if lines_data:
                 if self._render_docx_template_with_table_rows(
