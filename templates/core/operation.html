@@ -1021,17 +1021,31 @@ const CURRENT_USER_SITE = "{{ current_user_site }}";
         } catch (_err) {}
     };
 
-    // При смене вида работ — подставляем единицу и загружаем этапы
-workTypeSelect.addEventListener("change", () => {
+workTypeSelect.addEventListener("change", async () => {
     const selected = workTypeSelect.options[workTypeSelect.selectedIndex];
     if (selected && selected.dataset.unit && unitInput) {
         unitInput.value = selected.dataset.unit;
     }
-    // Подставляем плановый объём из договора
     const planVolumeInput = form.querySelector('input[name="planned_volume"]');
     if (planVolumeInput && selected && selected.dataset.quantity) {
         planVolumeInput.value = selected.dataset.quantity;
     }
+
+    // Загружаем этапы для выбранного вида работ
+    const stageSelect = form.querySelector('select[data-worklog-stage]');
+    if (!stageSelect || !workTypeSelect.value) return;
+    try {
+        const resp = await fetch(`/operations/api/work-stages/?work_type=${encodeURIComponent(workTypeSelect.value)}`);
+        const data = await resp.json();
+        const stages = data.stages || [];
+        stageSelect.innerHTML = '<option value="">Выберите этап</option>';
+        stages.forEach(s => {
+            const opt = document.createElement("option");
+            opt.value = s.stage_name;
+            opt.textContent = s.stage_name;
+            stageSelect.appendChild(opt);
+        });
+    } catch (_err) {}
 });
 
 // При смене этапа — подставляем плановую дату
