@@ -360,7 +360,6 @@ class StockIssueCreateForm(BaseStyledForm, forms.Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Собираем список участков
         values: list[str] = []
         values.extend(User.objects.filter(role=RoleChoices.SITE_MANAGER).exclude(site_name="").values_list("site_name", flat=True))
         values.extend(Worker.objects.exclude(site_name="").values_list("site_name", flat=True))
@@ -378,7 +377,6 @@ class StockIssueCreateForm(BaseStyledForm, forms.Form):
         self.fields["site_name"].choices = choices
         self.fields["received_by_user"].label_from_instance = lambda obj: obj.full_name_or_username
 
-        # Заявки участка которые уже использованы в отпуске на утверждении или выше
         busy_request_ids = StockIssue.objects.filter(
             status__in=[
                 DocumentStatus.APPROVAL, DocumentStatus.APPROVED,
@@ -386,9 +384,23 @@ class StockIssueCreateForm(BaseStyledForm, forms.Form):
             ]
         ).exclude(site_request=None).values_list("site_request_id", flat=True)
 
-        self.fields["site_request"].queryset = SiteMaterialRequest.objects.filter(
+        allowed_qs = SiteMaterialRequest.objects.filter(
             status__in=[DocumentStatus.APPROVED, DocumentStatus.ACCEPTED, DocumentStatus.SENT_ACCOUNTING]
-        ).exclude(id__in=busy_request_ids).order_by("-request_date")
+        ).exclude(id__in=busy_request_ids)
+
+        # Если в черновике есть значение — добавим его в queryset
+        initial_request_id = self.initial.get("site_request") or (self.data.get("site_request") if self.is_bound else None)
+        if initial_request_id:
+            from django.db.models import Q
+            allowed_qs = SiteMaterialRequest.objects.filter(
+                Q(id=initial_request_id) |
+                Q(
+                    status__in=[DocumentStatus.APPROVED, DocumentStatus.ACCEPTED, DocumentStatus.SENT_ACCOUNTING],
+                    id__in=allowed_qs.values_list("id", flat=True)
+                )
+            )
+
+        self.fields["site_request"].queryset = allowed_qs.order_by("-request_date")
 
     def clean_items(self):
         items = self.cleaned_data.get("items", "")
@@ -401,7 +413,6 @@ class StockIssueCreateForm(BaseStyledForm, forms.Form):
         if not cleaned_data.get("items") and not cleaned_data.get("site_request"):
             raise forms.ValidationError("Заполните позиции или выберите заявку участка.")
         return cleaned_data
-
 
 class WriteOffCreateForm(BaseStyledForm, forms.Form):
     act_date = forms.DateField(widget=DateInput(), initial=timezone.localdate, label="Дата акта")
