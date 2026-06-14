@@ -338,7 +338,7 @@ class StockIssueCreateForm(BaseStyledForm, forms.Form):
     issue_date = forms.DateField(widget=DateInput(), initial=timezone.localdate, label="Дата отпуска")
     site_name = forms.ChoiceField(choices=[], required=True, label="Участок")
     site_request = forms.ModelChoiceField(
-        queryset=SiteMaterialRequest.objects.none(),
+        queryset=SiteMaterialRequest.objects.all(),
         required=False,
         label="Заявка участка",
         help_text="В списке только утверждённые заявки участков.",
@@ -378,7 +378,7 @@ class StockIssueCreateForm(BaseStyledForm, forms.Form):
         self.fields["received_by_user"].label_from_instance = lambda obj: obj.full_name_or_username
 
 
-        self.fields["site_request"].queryset = SiteMaterialRequest.objects.all()
+        #self.fields["site_request"].queryset = SiteMaterialRequest.objects.all()
 
     def clean_items(self):
         items = self.cleaned_data.get("items", "")
