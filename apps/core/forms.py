@@ -378,9 +378,7 @@ class StockIssueCreateForm(BaseStyledForm, forms.Form):
         self.fields["received_by_user"].label_from_instance = lambda obj: obj.full_name_or_username
 
 
-        self.fields["site_request"].queryset = SiteMaterialRequest.objects.filter(
-            status__in=[DocumentStatus.APPROVED, DocumentStatus.ACCEPTED, DocumentStatus.SENT_ACCOUNTING]
-        ).order_by("-request_date")
+        self.fields["site_request"].queryset = SiteMaterialRequest.objects.all()
 
     def clean_items(self):
         items = self.cleaned_data.get("items", "")
