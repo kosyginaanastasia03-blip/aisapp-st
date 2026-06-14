@@ -1538,7 +1538,7 @@ class Exporter:
         from .models import SupplierDocumentLine
         invoice_price_index: dict[str, Decimal] = {}
         normalized_doc_type = (item.doc_type or "").casefold()
-        if "наклад" in normalized_doc_type or "упд" in normalized_doc_type:
+        if "наклад" in normalized_doc_type or "упд" in normalized_doc_type or "фактур" in normalized_doc_type:
             invoice_qs = SupplierDocument.objects.filter(
                 supplier=item.supplier,
                 doc_type__in=["Счёт", "Счет", "Счёт на оплату", "Счет на оплату"],
@@ -1611,7 +1611,7 @@ class Exporter:
 
             # Определяем подписантов в зависимости от типа документа
             _supplier_signer = self._short_name(item.supplier.contact_person) if item.supplier.contact_person else item.supplier.name
-            if "наклад" in normalized_doc_type or "упд" in normalized_doc_type:
+            if "наклад" in normalized_doc_type or "упд" in normalized_doc_type or "фактур" in normalized_doc_type:
                 # Товарная накладная / УПД: отпуск разрешил поставщик, получил кладовщик
                 _left_signer = _supplier_signer
                 _right_signer = _warehouse_short
