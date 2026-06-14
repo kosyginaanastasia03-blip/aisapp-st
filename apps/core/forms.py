@@ -900,12 +900,11 @@ class SMRContractForm(BaseStyledForm, forms.ModelForm):
 class SupplyContractForm(BaseStyledForm, forms.ModelForm):
     class Meta:
         model = SupplyContract
-        fields = ["number", "contract_date", "supplier", "related_smr_contract", "amount", "status", "terms"]
+        fields = ["number", "contract_date", "supplier", "amount", "status", "terms"]
         labels = {
             "number": "Номер",
             "contract_date": "Дата договора",
             "supplier": "Поставщик",
-            "related_smr_contract": "Связанный договор СМР",
             "amount": "Сумма",
             "status": "Статус",
             "terms": "Условия",
