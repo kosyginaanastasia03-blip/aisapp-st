@@ -377,30 +377,10 @@ class StockIssueCreateForm(BaseStyledForm, forms.Form):
         self.fields["site_name"].choices = choices
         self.fields["received_by_user"].label_from_instance = lambda obj: obj.full_name_or_username
 
-        busy_request_ids = StockIssue.objects.filter(
-            status__in=[
-                DocumentStatus.APPROVAL, DocumentStatus.APPROVED,
-                DocumentStatus.SENT_ACCOUNTING, DocumentStatus.ACCEPTED,
-            ]
-        ).exclude(site_request=None).values_list("site_request_id", flat=True)
 
-        allowed_qs = SiteMaterialRequest.objects.filter(
+        self.fields["site_request"].queryset = SiteMaterialRequest.objects.filter(
             status__in=[DocumentStatus.APPROVED, DocumentStatus.ACCEPTED, DocumentStatus.SENT_ACCOUNTING]
-        ).exclude(id__in=busy_request_ids)
-
-        # Если в черновике есть значение — добавим его в queryset
-        initial_request_id = self.initial.get("site_request") or (self.data.get("site_request") if self.is_bound else None)
-        if initial_request_id:
-            from django.db.models import Q
-            allowed_qs = SiteMaterialRequest.objects.filter(
-                Q(id=initial_request_id) |
-                Q(
-                    status__in=[DocumentStatus.APPROVED, DocumentStatus.ACCEPTED, DocumentStatus.SENT_ACCOUNTING],
-                    id__in=allowed_qs.values_list("id", flat=True)
-                )
-            )
-
-        self.fields["site_request"].queryset = allowed_qs.order_by("-request_date")
+        ).order_by("-request_date")
 
     def clean_items(self):
         items = self.cleaned_data.get("items", "")
