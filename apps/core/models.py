@@ -704,6 +704,14 @@ class StockMovement(TimeStampedModel):
     location_name = models.CharField(max_length=255)
     source_type = models.CharField(max_length=64)
     source_id = models.PositiveBigIntegerField()
+    contract = models.ForeignKey(
+        "SMRContract",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="stock_movements",
+        verbose_name="Договор СМР",
+    )
     unit_price = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="stock_movements")
     notes = models.TextField(blank=True)
