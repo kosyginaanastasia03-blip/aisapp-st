@@ -2932,8 +2932,18 @@ def site_stock_alerts() -> list[dict[str, Any]]:
         contract_id = row["issue__contract_id"]
         balance = balance_index.get((site_name, material_id, contract_id), Decimal("0"))
         material = Material.objects.filter(pk=material_id).first()
-        norm_balance = Decimal(material.stock_reserve_qty if material else 0)
-        deviation = balance - norm_balance
+        from .models import SiteMaterialRequestLine
+        request_line = SiteMaterialRequestLine.objects.filter(
+            material_id=material_id,
+            request__contract_id=row["issue__contract_id"],
+            request__site_name__iexact=site_name,
+        ).order_by("-request__request_date", "-id").first()
+
+        if request_line and request_line.reserve_qty:
+            norm_balance = Decimal(request_line.reserve_qty)
+        else:
+            material = Material.objects.filter(pk=material_id).first()
+            norm_balance = Decimal(material.stock_reserve_qty if material else 0)
  
         contract_status = row["issue__contract__status"]
         contract_closed = contract_status == DocumentStatus.ACCEPTED
