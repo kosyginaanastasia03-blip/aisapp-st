@@ -1561,6 +1561,11 @@ def create_supplier_document(*, user, cleaned_data: dict[str, Any], ip_address: 
     ]
     _validate_supplier_consistency(supplier=supplier, related_suppliers=related_suppliers)
  
+    _amount_no_vat = cleaned_data.get("amount") or Decimal("0")
+    _vat_rate = cleaned_data.get("vat_rate") or Decimal("0")
+    _vat_amount = _amount_no_vat * _vat_rate / Decimal("100")
+    _amount_with_vat = _amount_no_vat + _vat_amount
+
     document = SupplierDocument.objects.create(
         supplier=supplier,
         request=request,
@@ -1568,9 +1573,9 @@ def create_supplier_document(*, user, cleaned_data: dict[str, Any], ip_address: 
         doc_type=cleaned_data["doc_type"],
         doc_number=cleaned_data.get("doc_number") or generate_number(document_type.prefix if document_type else "SUPDOC"),
         doc_date=cleaned_data["doc_date"],
-        amount=cleaned_data.get("amount") or Decimal("0"),
-        vat_rate=cleaned_data.get("vat_rate") or Decimal("0"),
-        vat_amount=(cleaned_data.get("amount") or Decimal("0")) * (cleaned_data.get("vat_rate") or Decimal("0")) / Decimal("100"),
+        amount=_amount_with_vat,
+        vat_rate=_vat_rate,
+        vat_amount=_vat_amount,
         uploaded_by=user,
         attachment=cleaned_data.get("attachment"),
         status=DocumentStatus.UPLOADED,
@@ -1612,7 +1617,9 @@ def _check_supply_contract_budget(*, cleaned_data: dict[str, Any]) -> None:
     if doc_type not in INVOICE_DOC_TYPES:
         return
 
-    new_amount = Decimal(cleaned_data.get("amount") or 0)
+    _raw_amount = Decimal(cleaned_data.get("amount") or 0)
+    _raw_vat_rate = Decimal(cleaned_data.get("vat_rate") or 0)
+    new_amount = _raw_amount + _raw_amount * _raw_vat_rate / Decimal("100")
     if new_amount <= 0:
         return
 
