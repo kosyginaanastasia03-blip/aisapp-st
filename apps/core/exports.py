@@ -1207,6 +1207,17 @@ class Exporter:
                 for line in request.lines.all()
             ],
         )
+        supplier_name = (
+            self._short_name(request.supplier.contact_person)
+            if request.supplier and request.supplier.contact_person
+            else (request.supplier.name if request.supplier else "________________")
+        )
+        requester_name = (
+            self._short_name(request.requested_by.full_name_or_username)
+            if request.requested_by_id
+            else "________________"
+        )
+        self._add_signature(doc, f"Снабженец: {requester_name}", f"Поставщик: {supplier_name}")
         path = self._doc_path("procurement_request", request.number)
         doc.save(path)
         return path
