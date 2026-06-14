@@ -1805,6 +1805,7 @@ def create_stock_issue(*, user, cleaned_data: dict[str, Any], ip_address: str | 
             unit_price=unit_price,
             created_by=user,
             notes=issue.notes,
+            contract=issue.contract, 
         )
         StockMovement.objects.create(
             movement_date=issue.issue_date,
@@ -1816,6 +1817,7 @@ def create_stock_issue(*, user, cleaned_data: dict[str, Any], ip_address: str | 
             unit_price=unit_price,
             created_by=user,
             notes=issue.notes,
+            contract=issue.contract,
         )
     audit(user, "create", "stock_issue", issue.id, f"Создан отпуск материалов {issue.number}", ip_address)
     _notify_initial_document_status(actor=user, entity_type="stock_issue", entity_id=issue.id)
@@ -1849,7 +1851,7 @@ def create_writeoff(*, user, cleaned_data: dict[str, Any], ip_address: str | Non
  
         site_movements = (
             StockMovement.objects
-            .filter(location_name__iexact=site_name)
+            .filter(location_name__iexact=site_name, contract=contract)
             .values("material_id")
             .annotate(balance=Coalesce(
                 Sum("quantity_delta"),
@@ -1969,6 +1971,7 @@ def create_writeoff(*, user, cleaned_data: dict[str, Any], ip_address: str | Non
             unit_price=material.price,
             created_by=user,
             notes=movement_note,
+            contract=act.contract,
         )
  
     audit(user, "create", "write_off", act.id, f"Создан акт списания {act.number}", ip_address)
