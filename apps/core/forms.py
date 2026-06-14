@@ -394,6 +394,14 @@ class StockIssueCreateForm(BaseStyledForm, forms.Form):
             raise forms.ValidationError("Заполните позиции или выберите заявку участка.")
         return cleaned_data
 
+    def clean_site_request(self):
+        request_id = self.data.get("site_request")
+        if not request_id:
+            return None
+        try:
+            return SiteMaterialRequest.objects.get(pk=request_id)
+        except SiteMaterialRequest.DoesNotExist:
+            return None
 class WriteOffCreateForm(BaseStyledForm, forms.Form):
     act_date = forms.DateField(widget=DateInput(), initial=timezone.localdate, label="Дата акта")
     contract = forms.ModelChoiceField(queryset=SMRContract.objects.order_by("-contract_date"), label="Договор СМР", required=False, empty_label="Не выбрано (для хознужд)")

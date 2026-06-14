@@ -1758,6 +1758,18 @@ def create_stock_receipt(*, user, cleaned_data: dict[str, Any], ip_address: str 
 @transaction.atomic
 def create_stock_issue(*, user, cleaned_data: dict[str, Any], ip_address: str | None = None) -> StockIssue:
     site_request = cleaned_data.get("site_request")
+    if site_request:
+        duplicate = StockIssue.objects.filter(
+            site_request=site_request,
+            status__in=[
+                DocumentStatus.APPROVAL,
+                DocumentStatus.APPROVED,
+                DocumentStatus.SENT_ACCOUNTING,
+                DocumentStatus.ACCEPTED,
+            ]
+        ).first()
+        if duplicate:
+            raise ValueError(f"По заявке {site_request.number} уже создан отпуск {duplicate.number}.")
     _validate_status_chain(site_request, "Заявка участка")
     line_items = _line_items_from_text_or_site_request(cleaned_data)
     resolved_items: list[tuple[Material, dict[str, Any], Decimal]] = []
