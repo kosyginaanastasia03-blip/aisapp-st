@@ -584,28 +584,28 @@ class Exporter:
         table.cell(0, 1).text = f"{right_label}\n\n_____________________"
  
     def _organization_profile(self) -> dict[str, str]:
-    profile = getattr(settings, "ORGANIZATION_PROFILE", {}) or {}
-    if not isinstance(profile, dict):
-        profile = {"name": str(profile)}
-    return {
-        "name": str(profile.get("name", "")).strip(),
-        "tax_id": str(profile.get("tax_id", "")).strip(),
-        "kpp": str(profile.get("kpp", "")).strip(),
-        "ogrn": str(profile.get("ogrn", "")).strip(),
-        "address": str(profile.get("address", "")).strip(),
-        "bank_details": str(profile.get("bank_details", "")).strip(),
-        "requisites": str(profile.get("requisites", "")).strip(),
-        "contractor_signer_name": str(profile.get("contractor_signer_name", "")).strip(),
-        "contractor_signer_position": str(profile.get("contractor_signer_position", "")).strip(),
-        "contractor_signer_name_genitive": str(profile.get("contractor_signer_name_genitive", "")).strip(),
-        "contractor_signer_position_genitive": str(profile.get("contractor_signer_position_genitive", "")).strip(),
-        "contractor_auth_doc": str(profile.get("contractor_auth_doc", "")).strip(),
-        "bank_name": str(profile.get("bank_name", "")).strip(),
-        "bik": str(profile.get("bik", "")).strip(),
-        "account": str(profile.get("account", "")).strip(),
-        "corr_account": str(profile.get("corr_account", "")).strip(),
-        "okpo": str(profile.get("okpo", "")).strip(),
-    }
+        profile = getattr(settings, "ORGANIZATION_PROFILE", {}) or {}
+        if not isinstance(profile, dict):
+            profile = {"name": str(profile)}
+        return {
+            "name": str(profile.get("name", "")).strip(),
+            "tax_id": str(profile.get("tax_id", "")).strip(),
+            "kpp": str(profile.get("kpp", "")).strip(),
+            "ogrn": str(profile.get("ogrn", "")).strip(),
+            "address": str(profile.get("address", "")).strip(),
+            "bank_details": str(profile.get("bank_details", "")).strip(),
+            "requisites": str(profile.get("requisites", "")).strip(),
+            "contractor_signer_name": str(profile.get("contractor_signer_name", "")).strip(),
+            "contractor_signer_position": str(profile.get("contractor_signer_position", "")).strip(),
+            "contractor_signer_name_genitive": str(profile.get("contractor_signer_name_genitive", "")).strip(),
+            "contractor_signer_position_genitive": str(profile.get("contractor_signer_position_genitive", "")).strip(),
+            "contractor_auth_doc": str(profile.get("contractor_auth_doc", "")).strip(),
+            "bank_name": str(profile.get("bank_name", "")).strip(),
+            "bik": str(profile.get("bik", "")).strip(),
+            "account": str(profile.get("account", "")).strip(),
+            "corr_account": str(profile.get("corr_account", "")).strip(),
+            "okpo": str(profile.get("okpo", "")).strip(),
+        }
  
     def _organization_name(self) -> str:
         return self._organization_profile()["name"]
