@@ -1657,6 +1657,8 @@ class Exporter:
                 "VAT_RATE": "20",
                 "BASIS_DOCUMENT": item.request.number if item.request else "",
                 "ITEMS_COUNT": len(lines_data),
+                "TOTAL_AMOUNT_NO_VAT": money(Decimal(item.amount or 0) - Decimal(item.vat_amount or 0)),
+                "TOTAL_AMOUNT_WITH_VAT": money(item.amount),
                 "LEFT_SIGNER_NAME": _left_signer,
                 "RIGHT_SIGNER_NAME": _right_signer,
             }
