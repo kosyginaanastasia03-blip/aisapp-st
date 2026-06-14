@@ -280,12 +280,11 @@ CATALOG_CONFIG: dict[str, dict[str, Any]] = {
         "title": "Договоры поставки",
         "description": "Договоры на закупку и поставку материалов от контрагентов.",
         "form_class": SupplyContractForm,
-        "queryset": lambda: SupplyContract.objects.select_related("supplier", "related_smr_contract").order_by("-contract_date", "-id"),
+        "queryset": lambda: SupplyContract.objects.select_related("supplier").order_by("-contract_date", "-id"),
         "columns": [
             ("Номер", lambda obj: obj.number),
             ("Дата", lambda obj: obj.contract_date),
             ("Поставщик", lambda obj: obj.supplier.name),
-            ("Договор СМР", lambda obj: obj.related_smr_contract.number if obj.related_smr_contract else ""),
             ("Сумма договора", lambda obj: obj.amount),
             ("Израсходовано", lambda obj: _supply_contract_spent(obj)),
             ("Остаток", lambda obj: _supply_contract_remaining(obj)),
