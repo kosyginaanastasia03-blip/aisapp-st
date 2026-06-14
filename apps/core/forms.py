@@ -337,11 +337,11 @@ class StockReceiptCreateForm(BaseStyledForm, forms.Form):
 class StockIssueCreateForm(BaseStyledForm, forms.Form):
     issue_date = forms.DateField(widget=DateInput(), initial=timezone.localdate, label="Дата отпуска")
     site_name = forms.ChoiceField(choices=[], required=True, label="Участок")
-    site_request = forms.ModelChoiceField(
-        queryset=SiteMaterialRequest.objects.all(),
+    site_request = forms.IntegerField(
         required=False,
         label="Заявка участка",
         help_text="В списке только утверждённые заявки участков.",
+        widget=forms.Select(choices=[]),
     )
     contract = forms.ModelChoiceField(queryset=SMRContract.objects.order_by("-contract_date"), required=False, label="Договор СМР")
 
@@ -377,8 +377,12 @@ class StockIssueCreateForm(BaseStyledForm, forms.Form):
         self.fields["site_name"].choices = choices
         self.fields["received_by_user"].label_from_instance = lambda obj: obj.full_name_or_username
 
-
-        #self.fields["site_request"].queryset = SiteMaterialRequest.objects.all()
+        approved_requests = SiteMaterialRequest.objects.filter(
+            status__in=[DocumentStatus.APPROVED, DocumentStatus.ACCEPTED, DocumentStatus.SENT_ACCOUNTING]
+        ).order_by("-request_date")
+        self.fields["site_request"].widget.choices = [("", "Не выбрано")] + [
+            (r.pk, str(r)) for r in approved_requests
+        ]
 
     def clean_items(self):
         items = self.cleaned_data.get("items", "")
@@ -393,7 +397,7 @@ class StockIssueCreateForm(BaseStyledForm, forms.Form):
         return cleaned_data
 
     def clean_site_request(self):
-        request_id = self.data.get("site_request")
+        request_id = self.cleaned_data.get("site_request")
         if not request_id:
             return None
         try:
