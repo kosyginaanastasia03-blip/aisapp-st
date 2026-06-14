@@ -2917,11 +2917,11 @@ def site_stock_alerts() -> list[dict[str, Any]]:
     site_movements = (
         StockMovement.objects
         .exclude(location_name=settings.WAREHOUSE_NAME)
-        .values("location_name", "material_id")
+        .values("location_name", "material_id", "contract_id")
         .annotate(balance=Coalesce(Sum("quantity_delta"), Decimal("0")))
     )
     balance_index = {
-        (r["location_name"], r["material_id"]): r["balance"]
+        (r["location_name"], r["material_id"], r["contract_id"]): r["balance"]
         for r in site_movements
     }
  
@@ -2929,7 +2929,8 @@ def site_stock_alerts() -> list[dict[str, Any]]:
         site_name = row["issue__site_name"]
         material_id = row["material_id"]
         total_issued = row["total_issued"]
-        balance = balance_index.get((site_name, material_id), Decimal("0"))
+        contract_id = row["issue__contract_id"]
+        balance = balance_index.get((site_name, material_id, contract_id), Decimal("0"))
         material = Material.objects.filter(pk=material_id).first()
         norm_balance = Decimal(material.stock_reserve_qty if material else 0)
         deviation = balance - norm_balance
