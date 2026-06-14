@@ -234,6 +234,8 @@ class SMRContract(TimeStampedModel):
     customer_signer_name = models.CharField(max_length=255, blank=True, verbose_name="ФИО подписанта заказчика")
     customer_signer_position = models.CharField(max_length=255, blank=True, verbose_name="Должность подписанта заказчика")
     customer_auth_doc = models.CharField(max_length=255, blank=True, default="доверенности", verbose_name="Документ полномочий заказчика")
+    customer_signer_name_genitive = models.CharField(max_length=255, blank=True, verbose_name="ФИО подписанта заказчика (родительный падеж)")
+    customer_signer_position_genitive = models.CharField(max_length=255, blank=True, verbose_name="Должность подписанта заказчика (родительный падеж)")
     site_manager = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True, blank=True,
