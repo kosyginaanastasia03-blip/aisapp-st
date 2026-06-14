@@ -1393,6 +1393,9 @@ def operation_page(request: HttpRequest, slug: str) -> HttpResponse:
     _require_roles(request, set(config["allowed_roles"]))
 
     can_create = _can_create_in_config(request=request, config=config)
+    # Очищаем старый черновик при открытии формы
+    if request.method == "GET":
+        clear_operation_draft(user=request.user, operation_slug=slug)
     initial = config.get("initial", lambda _request: {})(request)
     draft_payload = {}
     rework_record, rework_instance = _rework_record_and_instance(request, config)
@@ -1456,7 +1459,7 @@ def operation_page(request: HttpRequest, slug: str) -> HttpResponse:
         "rows": _operation_rows(queryset, config["columns"], entity_type=config.get("entity_type"), user=request.user),
         "operation_has_export_actions": bool(config.get("entity_type")),
         "current_operation": slug,
-        "autosave_url": reverse("operation-draft", kwargs={"slug": slug}),
+        "autosave_url": "",
         "draft_loaded": bool(draft_payload),
         "entity_type": config.get("entity_type", ""),
         "can_create": can_create,
