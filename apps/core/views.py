@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+import math
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 import json
@@ -2116,9 +2116,9 @@ def contract_materials_json(request: HttpRequest) -> JsonResponse:
             "unit": m["unit"],
             "unit_price": m["unit_price"],
             # Итого = по договору + запас
-            "quantity": str((m["qty_by_contract"] + m["reserve"]).quantize(Decimal("0.001"))),
-            "qty_by_contract": str(m["qty_by_contract"].quantize(Decimal("0.001"))),
-            "reserve": str(m["reserve"].quantize(Decimal("0.001"))),
+            "quantity": str(math.ceil(float(m["qty_by_contract"] + m["reserve"]))),
+            "qty_by_contract": str(math.ceil(float(m["qty_by_contract"]))),
+            "reserve": str(math.ceil(float(m["reserve"]))),
             "notes": m["notes"],
         }
         for m in materials_needed.values()
