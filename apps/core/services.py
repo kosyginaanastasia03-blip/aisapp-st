@@ -2945,6 +2945,7 @@ def site_stock_alerts() -> list[dict[str, Any]]:
             material = Material.objects.filter(pk=material_id).first()
             norm_balance = Decimal(material.stock_reserve_qty if material else 0)
  
+        deviation = balance - norm_balance 
         contract_status = row["issue__contract__status"]
         contract_closed = contract_status == DocumentStatus.ACCEPTED
  
