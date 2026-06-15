@@ -1153,16 +1153,18 @@ class Exporter:
         return path
  
     def _export_site_material_request(self, entity_id: int) -> Path:
+        from .models import User, RoleChoices
         request = SiteMaterialRequest.objects.select_related("contract", "requested_by").prefetch_related("lines__material").get(pk=entity_id)
         requester_name = request.requested_by.full_name_or_username if request.requested_by_id else ""
         requester_short = self._short_name(requester_name) if requester_name else "________________"
+        warehouse_user = User.objects.filter(role=RoleChoices.WAREHOUSE, is_active=True).first()
+        warehouse_short = self._short_name(warehouse_user.full_name_or_username) if warehouse_user else "________________"
         doc = self._prepare_doc("ЗАЯВКА НА МАТЕРИАЛЫ СО СКЛАДА", f"№ {request.number} от {request.request_date}")
         self._add_meta(doc, [
             ("Участок", request.site_name),
             ("Договор СМР", request.contract.number if request.contract else "-"),
             ("Заявитель", requester_name),
             ("Статус", request.get_status_display()),
-            ("Комментарий", request.notes or "-"),
         ])
         self._add_table(
             doc,
@@ -1182,8 +1184,8 @@ class Exporter:
         )
         self._add_signature(
             doc,
-            f"Начальник участка ___ {requester_short}",
-            "Кладовщик ___ ________________"
+            f"Начальник участка\n\n_____________________\n{requester_short}",
+            f"Кладовщик\n\n_____________________\n{warehouse_short}"
         )
         path = self._doc_path("site_material_request", request.number)
         doc.save(path)
