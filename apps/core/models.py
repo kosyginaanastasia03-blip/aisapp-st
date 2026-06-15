@@ -860,3 +860,55 @@ class SupplierDocumentLine(models.Model):
 
     class Meta:
         ordering = ["material__code"]
+
+class OrganizationProfile(models.Model):
+    name = models.CharField(max_length=255, blank=True, verbose_name="Наименование организации")
+    tax_id = models.CharField(max_length=32, blank=True, verbose_name="ИНН")
+    kpp = models.CharField(max_length=32, blank=True, verbose_name="КПП")
+    ogrn = models.CharField(max_length=32, blank=True, verbose_name="ОГРН")
+    address = models.CharField(max_length=512, blank=True, verbose_name="Адрес")
+    bank_name = models.CharField(max_length=255, blank=True, verbose_name="Банк")
+    bik = models.CharField(max_length=32, blank=True, verbose_name="БИК")
+    account = models.CharField(max_length=64, blank=True, verbose_name="Расчётный счёт")
+    corr_account = models.CharField(max_length=64, blank=True, verbose_name="Корреспондентский счёт")
+    okpo = models.CharField(max_length=32, blank=True, verbose_name="ОКПО")
+    bank_details = models.TextField(blank=True, verbose_name="Банковские реквизиты (текстом)")
+    requisites = models.TextField(blank=True, verbose_name="Реквизиты (текстом)")
+    contractor_signer_name = models.CharField(max_length=255, blank=True, verbose_name="ФИО подписанта")
+    contractor_signer_position = models.CharField(max_length=255, blank=True, verbose_name="Должность подписанта")
+    contractor_signer_name_genitive = models.CharField(max_length=255, blank=True, verbose_name="ФИО подписанта (родительный падеж)")
+    contractor_signer_position_genitive = models.CharField(max_length=255, blank=True, verbose_name="Должность подписанта (родительный падеж)")
+    contractor_auth_doc = models.CharField(max_length=255, blank=True, verbose_name="Документ полномочий")
+
+    class Meta:
+        verbose_name = "Профиль организации"
+
+    def __str__(self) -> str:
+        return self.name or "Профиль организации"
+
+    @classmethod
+    def get(cls) -> "OrganizationProfile":
+        instance = cls.objects.first()
+        if not instance:
+            # Создаём из settings.py если ещё нет в БД
+            profile = getattr(settings, "ORGANIZATION_PROFILE", {}) or {}
+            instance = cls.objects.create(
+                name=profile.get("name", ""),
+                tax_id=profile.get("tax_id", ""),
+                kpp=profile.get("kpp", ""),
+                ogrn=profile.get("ogrn", ""),
+                address=profile.get("address", ""),
+                bank_name=profile.get("bank_name", ""),
+                bik=profile.get("bik", ""),
+                account=profile.get("account", ""),
+                corr_account=profile.get("corr_account", ""),
+                okpo=profile.get("okpo", ""),
+                bank_details=profile.get("bank_details", ""),
+                requisites=profile.get("requisites", ""),
+                contractor_signer_name=profile.get("contractor_signer_name", ""),
+                contractor_signer_position=profile.get("contractor_signer_position", ""),
+                contractor_signer_name_genitive=profile.get("contractor_signer_name_genitive", ""),
+                contractor_signer_position_genitive=profile.get("contractor_signer_position_genitive", ""),
+                contractor_auth_doc=profile.get("contractor_auth_doc", ""),
+            )
+        return instance
