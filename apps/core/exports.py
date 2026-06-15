@@ -576,12 +576,27 @@ class Exporter:
             for index, value in enumerate(row):
                 cells[index].text = value
  
-    def _add_signature(self, document, left_label: str, right_label: str) -> None:
+    def _add_signature_borderless(self, document, left_label: str, right_label: str, left_name: str, right_name: str) -> None:
+        from docx.oxml.ns import qn
+        from docx.oxml import OxmlElement
         document.add_paragraph()
-        table = document.add_table(rows=1, cols=2)
+        table = document.add_table(rows=2, cols=2)
         table.style = "Table Grid"
-        table.cell(0, 0).text = f"{left_label}\n\n_____________________"
-        table.cell(0, 1).text = f"{right_label}\n\n_____________________"
+        # Убираем границы
+        tbl = table._tbl
+        tblPr = tbl.tblPr
+        tblBorders = OxmlElement("w:tblBorders")
+        for border_name in ["top", "left", "bottom", "right", "insideH", "insideV"]:
+            border = OxmlElement(f"w:{border_name}")
+            border.set(qn("w:val"), "none")
+            tblBorders.append(border)
+        tblPr.append(tblBorders)
+        # Строка 1: должность
+        table.cell(0, 0).text = left_label
+        table.cell(0, 1).text = right_label
+        # Строка 2: черточка / ФИО
+        table.cell(1, 0).text = f"_____________________ / {left_name} /"
+        table.cell(1, 1).text = f"_____________________ / {right_name} /"
  
     def _organization_profile(self) -> dict[str, str]:
         profile = getattr(settings, "ORGANIZATION_PROFILE", {}) or {}
@@ -1182,10 +1197,12 @@ class Exporter:
                 for line in request.lines.all()
             ],
         )
-        self._add_signature(
+        self._add_signature_borderless(
             doc,
-            f"Начальник участка\n\n_____________________\n{requester_short}",
-            f"Кладовщик\n\n_____________________\n{warehouse_short}"
+            "Начальник участка",
+            "Кладовщик",
+            requester_short,
+            warehouse_short,
         )
         path = self._doc_path("site_material_request", request.number)
         doc.save(path)
