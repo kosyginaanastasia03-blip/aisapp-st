@@ -1720,7 +1720,7 @@ class Exporter:
                 "TOTAL_TO_PAY": money(item.amount),
                 "TOTAL_TO_PAY_WORDS": f"{money(item.amount)} руб.",
                 "VAT_AMOUNT": money(item.vat_amount),
-                "VAT_RATE": str(item.vat_rate or "20"),
+                "VAT_RATE": f"{int(item.vat_rate or 20)}%",
                 "BASIS_DOCUMENT": item.request.number if item.request else "",
                 "ITEMS_COUNT": len(lines_data),
                 "TOTAL_AMOUNT_NO_VAT": money(Decimal(item.amount or 0) - Decimal(item.vat_amount or 0)),
