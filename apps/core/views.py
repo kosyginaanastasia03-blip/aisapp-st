@@ -60,6 +60,7 @@ from .forms import (
     WorkScheduleCreateForm,
     WriteOffCreateForm,
     WorkStageControlForm,
+    OrganizationProfileForm,
 )
 from .models import (
     AuditLog,
@@ -88,6 +89,7 @@ from .models import (
     WorkSchedule,
     WorkScheduleLine,
     WriteOffAct,
+    OrganizationProfile,
 )
 
 from .reporting import REPORT_PROVIDERS, REPORT_TITLES
@@ -2565,3 +2567,18 @@ def site_request_contract_json(request: HttpRequest) -> JsonResponse:
     if not req or not req.contract_id:
         return JsonResponse({"contract_id": ""})
     return JsonResponse({"contract_id": req.contract_id})
+
+@login_required
+def organization_profile(request: HttpRequest) -> HttpResponse:
+    _require_roles(request, {RoleChoices.ADMIN})
+    instance = OrganizationProfile.get()
+    form = OrganizationProfileForm(request.POST or None, instance=instance)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Реквизиты организации сохранены.")
+        return redirect("organization-profile")
+    context = {
+        "title": "Реквизиты организации",
+        "form": form,
+    }
+    return _render(request, "core/organization_profile.html", context)
