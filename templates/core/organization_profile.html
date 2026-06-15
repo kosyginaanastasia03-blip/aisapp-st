@@ -5,32 +5,30 @@
     <p>Реквизиты организации используются при генерации документов.</p>
 </section>
 
-<section class="workspace-shell">
-    <article class="panel">
-        <div class="panel-head">
-            <h3>Реквизиты организации</h3>
-        </div>
-        {% if messages %}
-            {% for message in messages %}
-                <div class="field-help" style="color: green;">{{ message }}</div>
-            {% endfor %}
+<article class="panel">
+    <div class="panel-head">
+        <h3>Реквизиты организации</h3>
+    </div>
+    {% if messages %}
+        {% for message in messages %}
+            <div class="field-help" style="color: green;">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+    <form method="post" class="stack-form">
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+            <div class="field-error">{{ form.non_field_errors|join:", " }}</div>
         {% endif %}
-        <form method="post" class="stack-form">
-            {% csrf_token %}
-            {% if form.non_field_errors %}
-                <div class="field-error">{{ form.non_field_errors|join:", " }}</div>
-            {% endif %}
-            {% for field in form %}
-                <div class="field">
-                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                    {{ field }}
-                    {% if field.errors %}
-                        <div class="field-error">{{ field.errors|join:", " }}</div>
-                    {% endif %}
-                </div>
-            {% endfor %}
-            <button type="submit" class="primary-button">Сохранить</button>
-        </form>
-    </article>
-</section>
+        {% for field in form %}
+            <div class="field">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.errors %}
+                    <div class="field-error">{{ field.errors|join:", " }}</div>
+                {% endif %}
+            </div>
+        {% endfor %}
+        <button type="submit" class="primary-button">Сохранить</button>
+    </form>
+</article>
 {% endblock %}
