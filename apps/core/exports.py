@@ -1221,10 +1221,12 @@ class Exporter:
                 for line in request.lines.all()
             ],
         )
-        self._add_signature_no_border(
+        self._add_signature_borderless(
             doc,
-            f"Начальник участка: _____________________ / {requester_short} /",
-            f"Кладовщик: _____________________ / {warehouse_short} /"
+            "Начальник участка",
+            "Кладовщик",
+            requester_short,
+            warehouse_short,
         )
         path = self._doc_path("site_material_request", request.number)
         doc.save(path)
@@ -1264,7 +1266,13 @@ class Exporter:
             if request.requested_by_id
             else "________________"
         )
-        self._add_signature_no_border(doc, f"Снабженец: _____________________ / {requester_name} /", f"Поставщик: _____________________ / {supplier_name} /")
+        self._add_signature_borderless(
+            doc,
+            "Снабженец",
+            "Поставщик",
+            requester_name,
+            supplier_name,
+        )
         path = self._doc_path("procurement_request", request.number)
         doc.save(path)
         return path
