@@ -576,7 +576,7 @@ class ArchiveFilterForm(DateRangeValidationMixin, BaseStyledForm, forms.Form):
         super().__init__(*args, **kwargs)
         if getattr(self.user, 'role', None) == RoleChoices.SUPPLIER:
             self.fields.pop("counterparty", None)
-
+            self.fields.pop("object_name", None)
         # В архиве все документы со статусом «Принят» — фильтр статуса не нужен
         if self.is_archive:
             self.fields.pop("status", None)

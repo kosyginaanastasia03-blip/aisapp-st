@@ -2554,3 +2554,13 @@ def contract_details_json(request: HttpRequest) -> JsonResponse:
         "customer_name": contract.resolved_customer_name() or "",
         "work_type": contract.work_type or "",
     })
+
+@login_required
+def site_request_contract_json(request: HttpRequest) -> JsonResponse:
+    request_id = request.GET.get("request_id")
+    if not request_id:
+        return JsonResponse({"contract_id": ""})
+    req = SiteMaterialRequest.objects.filter(pk=request_id).first()
+    if not req or not req.contract_id:
+        return JsonResponse({"contract_id": ""})
+    return JsonResponse({"contract_id": req.contract_id})

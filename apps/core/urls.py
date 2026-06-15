@@ -23,6 +23,7 @@ urlpatterns = [
     path("operations/api/site-requests-by-site/", views.site_requests_by_site_json, name="site-requests-by-site"),
     path("operations/api/schedule-stage-dates/", views.schedule_stage_dates_json, name="schedule-stage-dates-json"),
     path("operations/<slug:slug>/", views.operation_page, name="operation-page"),
+    path("operations/api/site-request-contract/", views.site_request_contract_json, name="site-request-contract-json"),
     path("notifications/<int:notification_id>/read/", views.notification_read, name="notification-read"),
     path("notifications/read-all/", views.notifications_read_all, name="notifications-read-all"),
     path("notifications/feed/", views.notifications_feed, name="notifications-feed"),

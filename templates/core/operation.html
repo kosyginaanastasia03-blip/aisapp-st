@@ -1612,6 +1612,30 @@ if (stageSelect) {
     siteSelect.addEventListener("change", () => loadManager(siteSelect.value));
     if (siteSelect.value) loadManager(siteSelect.value);    
 })();
+// Подтягивание договора из заявки участка
+(() => {
+    const form = document.querySelector("form[data-autosave-url]");
+    if (!form) return;
+
+    const requestSelect = form.querySelector('select[name="site_request"]');
+    const contractSelect = form.querySelector('select[name="contract"]');
+    if (!requestSelect || !contractSelect) return;
+
+    const loadContractFromRequest = async () => {
+        const requestId = requestSelect.value;
+        if (!requestId) return;
+        try {
+            const resp = await fetch(`/operations/api/site-request-contract/?request_id=${requestId}`);
+            const data = await resp.json();
+            if (data.contract_id) {
+                contractSelect.value = data.contract_id;
+            }
+        } catch (_err) {}
+    };
+
+    requestSelect.addEventListener("change", loadContractFromRequest);
+    if (requestSelect.value) loadContractFromRequest();
+})();
 // Автозаполнение акта сдачи-приёмки из договора СМР
 (() => {
     const form = document.querySelector("form[data-autosave-url]");
