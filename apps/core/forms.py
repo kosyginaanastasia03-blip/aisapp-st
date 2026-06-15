@@ -33,6 +33,7 @@ from .models import (
     WorkLog,
     WriteOffAct,
     WriteOffTemplateVariant,
+    OrganizationProfile,
 )
 from .reporting import REPORT_CHOICES
 from .services import parse_line_items, parse_ppe_lines
@@ -1093,3 +1094,38 @@ class WorkStageControlForm(BaseStyledForm, forms.Form):
         if actual_start and actual_end and actual_start > actual_end:
             raise forms.ValidationError("Дата фактического начала не может быть позже даты фактического окончания.")
         return cleaned_data
+class OrganizationProfileForm(BaseStyledForm, forms.ModelForm):
+    class Meta:
+        model = OrganizationProfile
+        fields = [
+            "name", "tax_id", "kpp", "ogrn", "address",
+            "bank_name", "bik", "account", "corr_account", "okpo",
+            "bank_details", "requisites",
+            "contractor_signer_name", "contractor_signer_position",
+            "contractor_signer_name_genitive", "contractor_signer_position_genitive",
+            "contractor_auth_doc",
+        ]
+        labels = {
+            "name": "Наименование организации",
+            "tax_id": "ИНН",
+            "kpp": "КПП",
+            "ogrn": "ОГРН",
+            "address": "Адрес",
+            "bank_name": "Банк",
+            "bik": "БИК",
+            "account": "Расчётный счёт",
+            "corr_account": "Корреспондентский счёт",
+            "okpo": "ОКПО",
+            "bank_details": "Банковские реквизиты (текстом)",
+            "requisites": "Реквизиты (текстом)",
+            "contractor_signer_name": "ФИО подписанта",
+            "contractor_signer_position": "Должность подписанта",
+            "contractor_signer_name_genitive": "ФИО подписанта (родительный падеж)",
+            "contractor_signer_position_genitive": "Должность подписанта (родительный падеж)",
+            "contractor_auth_doc": "Документ полномочий",
+        }
+        widgets = {
+            "address": forms.Textarea(attrs={"rows": 2}),
+            "bank_details": forms.Textarea(attrs={"rows": 3}),
+            "requisites": forms.Textarea(attrs={"rows": 3}),
+        }

@@ -37,4 +37,5 @@ urlpatterns = [
     path("exports/report/", views.export_report, name="export-report"),
     path("backups/download/<str:backup_name>/", views.download_backup, name="download-backup"),
     path("operations/api/procurement-request-materials/", views.procurement_request_materials_json, name="procurement-request-materials-json"),
+    path("organization-profile/", views.organization_profile, name="organization-profile"),
 ]

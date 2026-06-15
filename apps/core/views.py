@@ -972,6 +972,7 @@ def _navigation(request: HttpRequest) -> dict[str, Any]:
         "audit_log_url": reverse("audit-log"),
         "dashboard_url": reverse("dashboard"),
         "analytics_url": reverse("analytics"),
+        "organization_profile_url": reverse("organization-profile") if role == RoleChoices.ADMIN else "",
         "can_access_documents": can_access_documents(role),
         "can_access_archive": can_access_archive(role),
         "can_access_reports": can_access_reports(role),

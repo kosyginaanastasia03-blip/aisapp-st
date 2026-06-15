@@ -88,6 +88,12 @@
                     {% endif %}
                 </nav>
             {% endif %}
+            {% if organization_profile_url %}
+                <a class="menu-link{% if request.path == organization_profile_url %} is-active{% endif %}" href="{{ organization_profile_url }}">
+                    <svg class="bi nav-icon" aria-hidden="true"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#building"></use></svg>
+                    <span>Реквизиты организации</span>
+                </a>
+            {% endif %}
         </aside>
 
         <main class="main">
