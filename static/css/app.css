@@ -2144,3 +2144,42 @@ tbody tr:last-child td {
         animation-iteration-count: 1 !important;
     }
 }
+.content-stack > .panel.is-scroll-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.panel.is-scroll-panel .panel-head {
+    flex: 0 0 auto;
+}
+
+.panel.is-scroll-panel .stack-form {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 4px;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.6) transparent;
+}
+
+.panel.is-scroll-panel .stack-form::-webkit-scrollbar {
+    width: 10px;
+}
+
+.panel.is-scroll-panel .stack-form::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.panel.is-scroll-panel .stack-form::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.6);
+    border-radius: 999px;
+}
+
+.panel.is-scroll-panel .stack-form::-webkit-scrollbar-thumb:hover {
+    background: rgba(100, 116, 139, 0.8);
+}
