@@ -1264,7 +1264,7 @@ class Exporter:
             if request.requested_by_id
             else "________________"
         )
-        self._add_signature(doc, f"Снабженец: _____________________ / {requester_name} /", f"Поставщик: _____________________ / {supplier_name} /")
+        self._add_signature_no_border(doc, f"Снабженец: _____________________ / {requester_name} /", f"Поставщик: _____________________ / {supplier_name} /")
         path = self._doc_path("procurement_request", request.number)
         doc.save(path)
         return path
