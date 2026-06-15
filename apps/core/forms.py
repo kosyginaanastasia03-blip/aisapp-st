@@ -312,7 +312,8 @@ class StockReceiptCreateForm(BaseStyledForm, forms.Form):
         ).exclude(supplier_document=None).values_list("supplier_document_id", flat=True)
 
         self.fields["supplier_document"].queryset = SupplierDocument.objects.filter(
-            status__in=approved_statuses
+            status__in=approved_statuses,
+            doc_type="Товарная накладная",
         ).exclude(id__in=busy_supplier_doc_ids).order_by("-doc_date")
 
     def clean_items(self):
