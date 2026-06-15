@@ -1158,12 +1158,12 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         metrics = dashboard_metrics(user=request.user)
         alerts = []
         warehouse_rows = []
-        site_rows = site_balances(site_name=site_name)[:10] if site_name else []
+        site_rows = site_balances(site_name=site_name)[:50] if site_name else []
     else:
         metrics = dashboard_metrics(user=request.user)
-        alerts = low_stock_alerts()[:6]
-        warehouse_rows = warehouse_balances()[:10]
-        site_rows = site_balances()[:10]
+        alerts = low_stock_alerts()[:50]
+        warehouse_rows = warehouse_balances()[:50]
+        site_rows = site_balances()[:50]
 
     alert_label = "Заявки участков" if request.user.role == RoleChoices.PROCUREMENT else "Низкие остатки"
 
@@ -1208,8 +1208,8 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         "alert_label": alert_label,
         "warehouse_rows": warehouse_rows,
         "site_rows": site_rows,
-        "recent_documents": recent_documents[:10],
-        "stock_alerts": stock_alerts[:10],        
+        "recent_documents": recent_documents[:50],
+        "stock_alerts": stock_alerts[:50],        
         "stock_alerts_count": len(stock_alerts),
         "chart_status_labels": json.dumps(status_labels, ensure_ascii=False),
         "chart_status_data": json.dumps([s["count"] for s in status_data]),
@@ -2044,7 +2044,10 @@ def supplier_documents_json(request: HttpRequest) -> JsonResponse:
         supplier_id = int(supplier_id)
     except (TypeError, ValueError):
         return JsonResponse({"documents": []})
-    docs = SupplierDocument.objects.filter(supplier_id=supplier_id).order_by("-doc_date")
+    docs = SupplierDocument.objects.filter(
+        supplier_id=supplier_id,
+        doc_type="Товарная накладная",
+    ).order_by("-doc_date")
     data = [
         {"id": doc.pk, "label": str(doc)}
         for doc in docs

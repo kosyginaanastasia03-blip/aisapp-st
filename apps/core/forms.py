@@ -296,7 +296,7 @@ class StockReceiptCreateForm(BaseStyledForm, forms.Form):
         required=False,
         widget=forms.HiddenInput(attrs={"data-items-mode": "material-lines"}),
         label="Позиции",
-        help_text="Заполните позиции или выберите товарную накладную / УПД.",
+        help_text="Заполните позиции или выберите товарную накладную.",
     )
 
     def __init__(self, *args, **kwargs):
