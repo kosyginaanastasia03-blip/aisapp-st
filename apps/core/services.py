@@ -1069,7 +1069,36 @@ def _notify_status_event(*, actor, record: DocumentRecord, previous_status: str 
     rework_reason = (record.metadata_json or {}).get("last_rework_reason", "")
     if record.status == DocumentStatus.REWORK and rework_reason:
         message = f"{message} Причина: {rework_reason}."
- 
+    # Уведомление поставщика при утверждении заявки на закупку
+    if record.entity_type == "procurement_request" and record.status == DocumentStatus.APPROVED:
+        from .models import ProcurementRequest
+        proc_request = ProcurementRequest.objects.filter(pk=record.entity_id).first()
+        if proc_request and proc_request.supplier:
+            _notify_document_event(
+                actor=actor,
+                roles={RoleChoices.SUPPLIER},
+                supplier=proc_request.supplier,
+                title="Новая заявка на закупку",
+                message=f"Заявка {proc_request.number} по участку {proc_request.site_name} утверждена и ожидает вашего участия.",
+                entity_type="procurement_request",
+                entity_id=proc_request.id,
+                include_admin=False,
+            )
+
+    # Уведомление кладовщика при утверждении товарной накладной
+    if record.entity_type == "supplier_document" and record.status == DocumentStatus.APPROVED:
+        from .models import SupplierDocument
+        sup_doc = SupplierDocument.objects.filter(pk=record.entity_id).first()
+        if sup_doc and sup_doc.doc_type == "Товарная накладная":
+            _notify_document_event(
+                actor=actor,
+                roles={RoleChoices.WAREHOUSE},
+                title="Товарная накладная утверждена",
+                message=f"Товарная накладная {sup_doc.doc_number} от {sup_doc.supplier.name} поступила и готова к оприходованию.",
+                entity_type="supplier_document",
+                entity_id=sup_doc.id,
+                include_admin=False,
+            )
     notify_users(
         recipients,
         kind=_status_notification_kind(record.status),
