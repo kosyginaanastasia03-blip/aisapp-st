@@ -1855,6 +1855,19 @@ def create_writeoff(*, user, cleaned_data: dict[str, Any], ip_address: str | Non
     if template_variant == WriteOffTemplateVariant.CONTRACT:
         _validate_status_chain(contract, "Договор СМР")
  
+    # Проверяем что акт сдачи-приёмки по этому договору утверждён
+    if template_variant == WriteOffTemplateVariant.CONTRACT:
+        from .models import WorkAcceptanceAct
+        accepted_act = WorkAcceptanceAct.objects.filter(
+            contract=contract,
+            status__in=[DocumentStatus.APPROVED, DocumentStatus.ACCEPTED, DocumentStatus.SENT_ACCOUNTING],
+        ).first()
+        if not accepted_act:
+            raise ValueError(
+                f"По договору {contract.number} нет утверждённого акта сдачи-приёмки. "
+                f"Сначала создайте и утвердите акт сдачи-приёмки выполненных работ."
+            )
+        
     if template_variant == WriteOffTemplateVariant.PRODUCTION_ECONOMIC:
         site_name = cleaned_data["site_name"]
         work_type = "Производственно-хозяйственные нужды"

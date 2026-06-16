@@ -483,7 +483,7 @@ class WriteOffCreateForm(BaseStyledForm, forms.Form):
 class PPEIssuanceCreateForm(BaseStyledForm, forms.Form):
     issue_date = forms.DateField(widget=DateInput(), initial=timezone.localdate, label="Дата выдачи")
     site_name = forms.CharField(max_length=255, label="Участок")
-    season = forms.ChoiceField(choices=[("летняя", "летняя"), ("зимняя", "зимняя")], required=False, label="Сезон")
+    season = forms.ChoiceField(choices=[("летняя", "летняя"), ("зимняя", "зимняя"), ("перчатки", "перчатки")], required=False, label="Сезон")
     items = forms.CharField(
         widget=forms.HiddenInput(attrs={"data-items-mode": "ppe-lines"}),
         label="Позиции",
