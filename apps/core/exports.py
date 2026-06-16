@@ -1065,7 +1065,7 @@ class Exporter:
             "SITE_NAME": issuance.site_name,
             "PPE_CATEGORY": issuance.season or "СИЗ",
             "SITE_MANAGER_NAME": self._short_name(issued_by_name) if issued_by_name else "________________",
-            "RESPONSIBLE_PERSON_NAME": self._short_name(confirmed_by_name or issued_by_name) if (confirmed_by_name or issued_by_name) else "________________",
+            "RESPONSIBLE_PERSON_NAME": self._short_name(confirmed_by_name) if confirmed_by_name else "________________",
             "LEFT_SIGNER_NAME": self._short_name(issued_by_name) if issued_by_name else "________________",
             "RIGHT_SIGNER_NAME": self._short_name(confirmed_by_name) if confirmed_by_name else "________________",
         }
