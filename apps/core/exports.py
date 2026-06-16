@@ -1565,7 +1565,7 @@ class Exporter:
                 "UNIT": line.material.unit,
                 "UNIT_NAME": line.material.unit,
                 "UNIT_CODE": line.material.unit,
-                "QUANTITY": str(line.quantity),
+                "QUANTITY": str(int(line.quantity)),
                 "SERVICE_LIFE_MONTHS": str(line.service_life_months),
                 "START_DATE": self._date_text(line.replacement_start_date),
                 "WORKER_SIGNATURE": "",
