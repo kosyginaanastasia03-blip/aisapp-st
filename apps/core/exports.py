@@ -97,6 +97,11 @@ class Exporter:
             return f"{parts[1][0]}.{parts[0]}"
         return full_name or "________________"
  
+    def _warehouse_user_name(self) -> str:
+        from .models import User, RoleChoices
+        user = User.objects.filter(role=RoleChoices.WAREHOUSE, is_active=True).first()
+        return user.full_name_or_username if user else "________________"
+    
     def _export_work_schedule(self, entity_id: int) -> Path:
         from .models import WorkSchedule
         Document, WD_ALIGN_PARAGRAPH, Pt = _load_docx_dependencies()
@@ -1065,9 +1070,9 @@ class Exporter:
             "SITE_NAME": issuance.site_name,
             "PPE_CATEGORY": issuance.season or "СИЗ",
             "SITE_MANAGER_NAME": self._short_name(issued_by_name) if issued_by_name else "________________",
-            "RESPONSIBLE_PERSON_NAME": self._short_name(confirmed_by_name) if confirmed_by_name else "________________",
-            "LEFT_SIGNER_NAME": self._short_name(issued_by_name) if issued_by_name else "________________",
-            "RIGHT_SIGNER_NAME": self._short_name(confirmed_by_name) if confirmed_by_name else "________________",
+            "RESPONSIBLE_PERSON_NAME": self._short_name(confirmed_by_name) if confirmed_by_name else self._short_name(self._warehouse_user_name()),
+            "LEFT_SIGNER_NAME": self._short_name(confirmed_by_name) if confirmed_by_name else self._short_name(self._warehouse_user_name()),
+            "RIGHT_SIGNER_NAME": self._short_name(issued_by_name) if issued_by_name else "________________",
         }
         return context
  
