@@ -1363,6 +1363,9 @@ def catalog_page(request: HttpRequest, slug: str) -> HttpResponse:
         MaterialNorm.objects.values_list("work_type", flat=True)
         .distinct().order_by("work_type")
     )
+    work_type_units: dict[str, str] = {}
+    for row in MaterialNorm.objects.exclude(unit="").values("work_type", "unit").order_by("work_type"):
+        work_type_units.setdefault(row["work_type"], row["unit"])
     context = {
         "title": config["title"],
         "description": config["description"],
@@ -1384,6 +1387,7 @@ def catalog_page(request: HttpRequest, slug: str) -> HttpResponse:
         "current_catalog": slug,
         "created_export_url": _created_export_url(request, config, queryset),
         "work_type_choices": work_type_choices,
+        "work_type_units": work_type_units,
         "material_catalog": _material_catalog() if slug == "norms" else [],
     }
     return _render(request, "core/catalogs.html", context)

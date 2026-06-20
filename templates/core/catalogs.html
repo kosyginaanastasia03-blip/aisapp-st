@@ -192,6 +192,7 @@
     </div>
 </section>
 {{ work_type_choices|json_script:"work-type-choices-data" }}
+{{ work_type_units|json_script:"work-type-units-data" }}
 <script>
 (() => {
     const section = document.getElementById("work-lines-section");
@@ -206,6 +207,11 @@
     const workTypes = (() => {
         const node = document.getElementById("work-type-choices-data");
         try { return JSON.parse(node?.textContent || "[]"); } catch { return []; }
+    })();
+
+    const workTypeUnits = (() => {
+        const node = document.getElementById("work-type-units-data");
+        try { return JSON.parse(node?.textContent || "{}"); } catch { return {}; }
     })();
 
     const editableCell = (value = "", type = "text", style = "") => {
@@ -241,6 +247,8 @@
         row.appendChild(numCell);
 
         const sectionInput = editableCell(seed.section || "", "text", "width:100px");
+        const unitInput = editableCell(seed.unit || "", "text", "width:80px");
+        const qtyInput = editableCell(seed.quantity || "", "number", "width:100px");
 
         const nameSelect = document.createElement("select");
         nameSelect.className = "form-input";
@@ -256,10 +264,13 @@
             if (wt === seed.work_type) opt.selected = true;
             nameSelect.appendChild(opt);
         });
-        nameSelect.addEventListener("change", syncHidden);
-
-        const unitInput = editableCell(seed.unit || "", "text", "width:80px");
-        const qtyInput = editableCell(seed.quantity || "", "number", "width:100px");
+        nameSelect.addEventListener("change", () => {
+            const unit = workTypeUnits[nameSelect.value];
+            if (unit) {
+                unitInput.value = unit;
+            }
+            syncHidden();
+        });
 
         const sectionTd = document.createElement("td");
         sectionTd.appendChild(sectionInput);

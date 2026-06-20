@@ -999,14 +999,36 @@ class UserForm(BaseStyledForm, forms.ModelForm):
         cleaned_data = super().clean()
         role = cleaned_data.get("role")
         supplier = cleaned_data.get("supplier")
+        site_name = (cleaned_data.get("site_name") or "").strip()
         password1 = cleaned_data.get("password1") or ""
         password2 = cleaned_data.get("password2") or ""
 
         if role == RoleChoices.SUPPLIER:
             if supplier is None:
                 self.add_error("supplier", "Для роли поставщика нужно выбрать связанного поставщика.")
+            else:
+                existing_supplier_user = User.objects.filter(role=RoleChoices.SUPPLIER, supplier=supplier)
+                if self.instance.pk:
+                    existing_supplier_user = existing_supplier_user.exclude(pk=self.instance.pk)
+                if existing_supplier_user.exists():
+                    self.add_error(
+                        "supplier",
+                        "Для этого поставщика уже создан пользователь. Используйте существующую учетную запись.",
+                    )
         else:
             cleaned_data["supplier"] = None
+
+        if role == RoleChoices.SITE_MANAGER and site_name:
+            existing_site_manager = User.objects.filter(
+                role=RoleChoices.SITE_MANAGER, site_name__iexact=site_name, is_active=True,
+            )
+            if self.instance.pk:
+                existing_site_manager = existing_site_manager.exclude(pk=self.instance.pk)
+            if existing_site_manager.exists():
+                self.add_error(
+                    "site_name",
+                    "На этом участке уже есть активный начальник участка.",
+                )
 
         if not self.instance.pk and not password1:
             self.add_error("password1", "Укажите пароль для новой учетной записи.")
