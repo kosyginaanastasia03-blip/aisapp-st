@@ -8,6 +8,9 @@ from pathlib import Path
 from typing import Any, Iterable
 from zipfile import ZIP_DEFLATED, ZipFile
 from xml.sax.saxutils import escape as xml_escape
+from copy import copy
+
+from openpyxl import load_workbook
 
 from django.conf import settings
 
@@ -347,13 +350,6 @@ class Exporter:
                 target.writestr(member, data)
         return True
 
-    def _shift_ref(self, ref: str, delta: int) -> str:
-        match = CELL_REF_RE.match(ref)
-        if not match:
-            return ref
-        col, row = match.groups()
-        return f"{col}{int(row) + delta}"
-
     def _render_xlsx_template_with_rows(
         self,
         template_name: str,
@@ -364,128 +360,89 @@ class Exporter:
         template_row_number: int,
     ) -> bool:
         """
-        Рендерит xlsx-шаблон, в котором есть ровно одна строка-образец
-        (template_row_number) с плейсхолдерами вида {{KEY}}. Строка
-        размножается под фактическое количество table_rows, а все строки
-        ниже образца (например "Итого") автоматически сдвигаются вниз
-        вместе с merge-ячейками и диапазоном dimension.
+        Рендерит xlsx-шаблон через openpyxl: в шаблоне есть ровно одна
+        строка-образец (template_row_number) с плейсхолдерами {{KEY}}.
+        Строка размножается под фактическое количество table_rows, стиль
+        копируется, а строки ниже образца (например "Итого") и связанные
+        с ними merge-диапазоны автоматически сдвигаются.
+        Использование openpyxl вместо ручной правки OOXML гарантирует
+        валидность файла для Excel (файл не "лечится"/не повреждается).
         """
         template_path = self._template_path(template_name)
         if not template_path:
             return False
 
-        replacements = {k: "" if v is None else str(v) for k, v in context.items()}
+        wb = load_workbook(template_path)
+        ws = wb.active
+        max_col = ws.max_column
 
-        with ZipFile(template_path, "r") as source:
-            names = source.namelist()
-            sheet_name = next(n for n in names if n.startswith("xl/worksheets/sheet") and n.endswith(".xml"))
-            sheet_xml = source.read(sheet_name).decode("utf-8")
-            shared_strings_name = "xl/sharedStrings.xml"
-            shared_xml = source.read(shared_strings_name).decode("utf-8") if shared_strings_name in names else None
+        rows = table_rows or []
+        n = len(rows)
+        delta = n - 1
 
-            shared_strings: list[str] = []
-            if shared_xml:
-                for si_match in re.finditer(r"<si>(.*?)</si>", shared_xml, re.DOTALL):
-                    t_match = re.search(r"<t[^>]*>(.*?)</t>", si_match.group(1), re.DOTALL)
-                    shared_strings.append(t_match.group(1) if t_match else "")
+        template_styles = []
+        template_values = []
+        for col in range(1, max_col + 1):
+            cell = ws.cell(row=template_row_number, column=col)
+            template_styles.append({
+                "font": copy(cell.font),
+                "border": copy(cell.border),
+                "fill": copy(cell.fill),
+                "alignment": copy(cell.alignment),
+                "number_format": cell.number_format,
+            })
+            template_values.append(cell.value)
 
-            row_pattern = re.compile(rf'<row r="{template_row_number}"[^>]*>.*?</row>', re.DOTALL)
-            row_match = row_pattern.search(sheet_xml)
-            if not row_match:
-                return False
-            template_row_xml = row_match.group(0)
-            row_start, row_end = row_match.span()
+        merges_below = []
+        for merged_range in list(ws.merged_cells.ranges):
+            if merged_range.min_row > template_row_number:
+                merges_below.append(
+                    (merged_range.min_col, merged_range.min_row, merged_range.max_col, merged_range.max_row)
+                )
+                ws.unmerge_cells(str(merged_range))
 
-            def resolve_cell(m: re.Match) -> str:
-                attrs_before, attrs_after, idx = m.groups()
-                text = shared_strings[int(idx)]
-                return f'<c {attrs_before}t="str"{attrs_after}><v>{xml_escape(text)}</v></c>'
+        if delta > 0:
+            ws.insert_rows(template_row_number + 1, amount=delta)
+        elif delta < 0:
+            ws.delete_rows(template_row_number, amount=1)
 
-            template_row_xml = re.sub(
-                r'<c ([^>]*?)t="s"([^>]*)><v>(\d+)</v></c>',
-                resolve_cell,
-                template_row_xml,
+        for i, row_data in enumerate(rows):
+            row_idx = template_row_number + i
+            for col in range(1, max_col + 1):
+                cell = ws.cell(row=row_idx, column=col)
+                style = template_styles[col - 1]
+                cell.font = style["font"]
+                cell.border = style["border"]
+                cell.fill = style["fill"]
+                cell.alignment = style["alignment"]
+                cell.number_format = style["number_format"]
+
+                value = template_values[col - 1]
+                if isinstance(value, str):
+                    for key, val in row_data.items():
+                        marker = "{{" + key + "}}"
+                        if marker in value:
+                            value = value.replace(marker, "" if val is None else str(val))
+                    value = PLACEHOLDER_RE.sub("", value)
+                    cell.value = value if value != "" else None
+                else:
+                    cell.value = value
+
+        for min_col, min_row, max_col_m, max_row in merges_below:
+            new_min_row = min_row + delta
+            new_max_row = max_row + delta
+            ws.merge_cells(
+                start_row=new_min_row, start_column=min_col,
+                end_row=new_max_row, end_column=max_col_m,
             )
 
-            rows = table_rows or []
-            n = len(rows)
-            delta = n - 1
+        replacements = {k: "" if v is None else str(v) for k, v in context.items()}
+        for row in ws.iter_rows():
+            for cell in row:
+                if isinstance(cell.value, str) and "{{" in cell.value:
+                    cell.value = PLACEHOLDER_RE.sub(lambda m: replacements.get(m.group(1), ""), cell.value)
 
-            new_rows_xml = []
-            for i, row_data in enumerate(rows):
-                row_xml = re.sub(
-                    r'r="([A-Z]+\d+)"',
-                    lambda m: f'r="{self._shift_ref(m.group(1), i)}"',
-                    template_row_xml,
-                )
-                for key, value in row_data.items():
-                    marker = "{{" + key + "}}"
-                    row_xml = row_xml.replace(marker, xml_escape(str(value if value is not None else "")))
-                row_xml = PLACEHOLDER_RE.sub("", row_xml)
-                new_rows_xml.append(row_xml)
-
-            sheet_xml = sheet_xml[:row_start] + "".join(new_rows_xml) + sheet_xml[row_end:]
-
-            if delta != 0:
-                def shift_row_block(m: re.Match) -> str:
-                    row_num = int(m.group(1))
-                    if row_num <= template_row_number:
-                        return m.group(0)
-                    block = m.group(0)
-                    return re.sub(
-                        r'r="([A-Z]+\d+)"',
-                        lambda mm: f'r="{self._shift_ref(mm.group(1), delta)}"',
-                        block,
-                    )
-                sheet_xml = re.sub(r'<row r="(\d+)"[^>]*>.*?</row>', shift_row_block, sheet_xml, flags=re.DOTALL)
-
-                def shift_merge(m: re.Match) -> str:
-                    ref = m.group(1)
-                    start_ref, end_ref = ref.split(":")
-                    start_row = int(CELL_REF_RE.match(start_ref).group(2))
-                    if start_row <= template_row_number:
-                        return m.group(0)
-                    return f'mergeCell ref="{self._shift_ref(start_ref, delta)}:{self._shift_ref(end_ref, delta)}"'
-                sheet_xml = re.sub(r'mergeCell ref="([A-Z]+\d+:[A-Z]+\d+)"', shift_merge, sheet_xml)
-
-                dim_match = re.search(r'<dimension ref="([A-Z]+\d+):([A-Z]+\d+)"/>', sheet_xml)
-                if dim_match:
-                    start_ref, end_ref = dim_match.groups()
-                    end_col, end_row = CELL_REF_RE.match(end_ref).groups()
-                    new_end_row = int(end_row) + delta
-                    sheet_xml = sheet_xml.replace(
-                        dim_match.group(0),
-                        f'<dimension ref="{start_ref}:{end_col}{new_end_row}"/>',
-                    )
-
-            if shared_xml:
-                def replace_shared(m: re.Match) -> str:
-                    return PLACEHOLDER_RE.sub(lambda pm: xml_escape(replacements.get(pm.group(1), "")), m.group(0))
-                shared_xml = re.sub(r"<t[^>]*>.*?</t>", replace_shared, shared_xml, flags=re.DOTALL)
-
-            sheet_xml = PLACEHOLDER_RE.sub(lambda m: xml_escape(replacements.get(m.group(1), "")), sheet_xml)
-
-            # Пересчитываем count в sharedStrings.xml под фактическое число
-            # ссылок t="s", оставшихся в листе после конвертации строк
-            # образца в инлайн-текст. Без этого Excel считает файл
-            # повреждённым и "лечит" его при открытии.
-            if shared_xml:
-                actual_refs = len(re.findall(r't="s"', sheet_xml))
-                shared_xml = re.sub(
-                    r'(<sst[^>]*\bcount=")\d+(")',
-                    lambda m: f'{m.group(1)}{actual_refs}{m.group(2)}',
-                    shared_xml,
-                    count=1,
-                )
-
-            with ZipFile(path, "w", ZIP_DEFLATED) as target:
-                for member in source.infolist():
-                    if member.filename == sheet_name:
-                        target.writestr(member, sheet_xml.encode("utf-8"))
-                    elif member.filename == shared_strings_name and shared_xml is not None:
-                        target.writestr(member, shared_xml.encode("utf-8"))
-                    else:
-                        target.writestr(member, source.read(member.filename))
+        wb.save(path)
         return True
 
     def _date_text(self, value: Any) -> str:
