@@ -465,6 +465,19 @@ class Exporter:
 
             sheet_xml = PLACEHOLDER_RE.sub(lambda m: xml_escape(replacements.get(m.group(1), "")), sheet_xml)
 
+            # Пересчитываем count в sharedStrings.xml под фактическое число
+            # ссылок t="s", оставшихся в листе после конвертации строк
+            # образца в инлайн-текст. Без этого Excel считает файл
+            # повреждённым и "лечит" его при открытии.
+            if shared_xml:
+                actual_refs = len(re.findall(r't="s"', sheet_xml))
+                shared_xml = re.sub(
+                    r'(<sst[^>]*\bcount=")\d+(")',
+                    lambda m: f'{m.group(1)}{actual_refs}{m.group(2)}',
+                    shared_xml,
+                    count=1,
+                )
+
             with ZipFile(path, "w", ZIP_DEFLATED) as target:
                 for member in source.infolist():
                     if member.filename == sheet_name:
