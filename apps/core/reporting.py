@@ -245,14 +245,11 @@ def report_stock(filters: dict[str, Any], *, user=None) -> list[dict[str, Any]]:
         outgoing = item["outgoing"]
         closing = item["closing"]
 
-        # Для участков с нулевыми значениями не добавляем пустые строки.
         if location_name != settings.WAREHOUSE_NAME and opening == incoming == outgoing == closing == Decimal("0"):
             continue
 
         unit_price = _to_decimal(material.price)
         closing_amount = closing * unit_price
-        min_stock = _to_decimal(material.stock_reserve_qty)
-        min_stock_mark = "Да" if closing <= min_stock else "Нет"
 
         rows.append(
             {
@@ -267,8 +264,6 @@ def report_stock(filters: dict[str, Any], *, user=None) -> list[dict[str, Any]]:
                 "Остаток на конец": _to_float(closing),
                 "Цена за единицу": _to_float(unit_price),
                 "Сумма остатка": _to_float(closing_amount),
-                "Мин. остаток": _to_float(min_stock),
-                "Минимальный остаток достигнут": min_stock_mark,
             }
         )
         total_opening += opening
@@ -291,11 +286,16 @@ def report_stock(filters: dict[str, Any], *, user=None) -> list[dict[str, Any]]:
                 "Остаток на конец": _to_float(total_closing),
                 "Цена за единицу": "",
                 "Сумма остатка": _to_float(total_closing_amount),
-                "Мин. остаток": "",
-                "Минимальный остаток достигнут": "",
             }
         )
     return rows
+
+
+def report_site_material(filters: dict[str, Any], *, user=None) -> list[dict[str, Any]]:
+    """Материальный отчёт по участку — без цены и суммы остатка."""
+    rows = report_stock(filters, user=user)
+    remove = {"Цена за единицу", "Сумма остатка"}
+    return [{k: v for k, v in row.items() if k not in remove} for row in rows]
 
 
 def report_purchases(filters: dict[str, Any], *, user=None) -> list[dict[str, Any]]:
@@ -579,7 +579,6 @@ def report_summary_scoped_v2(filters: dict[str, Any], *, user=None) -> list[dict
 
     grand_total_amount = Decimal("0")
 
-    # 1. Действующие договоры СМР.
     contracts_qs = SMRContract.objects.select_related("object").filter(contract_date__lte=date_to).filter(
         Q(end_date__isnull=True) | Q(end_date__gte=date_from)
     )
@@ -630,7 +629,6 @@ def report_summary_scoped_v2(filters: dict[str, Any], *, user=None) -> list[dict
     )
     grand_total_amount += section_total
 
-    # 2. Поступление материалов за период (по позициям прихода).
     receipts_qs = StockReceiptLine.objects.select_related("material", "receipt__supplier", "receipt__supplier_document__request").filter(
         receipt__receipt_date__range=(date_from, date_to)
     )
@@ -685,7 +683,6 @@ def report_summary_scoped_v2(filters: dict[str, Any], *, user=None) -> list[dict
     )
     grand_total_amount += section_total
 
-    # 3. Движение материалов (приход/расход/остаток).
     warehouse_or_site = site_name if user_role == RoleChoices.SITE_MANAGER and site_name else settings.WAREHOUSE_NAME
     movement_qs = StockMovement.objects.select_related("material").filter(location_name=warehouse_or_site, movement_date__lte=date_to)
     if material_code:
@@ -734,7 +731,6 @@ def report_summary_scoped_v2(filters: dict[str, Any], *, user=None) -> list[dict
     )
     grand_total_amount += section_total
 
-    # 4. Списание материалов по объектам.
     writeoff_qs = WriteOffLine.objects.select_related("act__contract__object").filter(act__act_date__range=(date_from, date_to))
     if user_role == RoleChoices.SITE_MANAGER:
         writeoff_qs = writeoff_qs.filter(act__site_name__iexact=site_name) if site_name else writeoff_qs.none()
@@ -778,7 +774,6 @@ def report_summary_scoped_v2(filters: dict[str, Any], *, user=None) -> list[dict
     )
     grand_total_amount += section_total
 
-    # 5. Закупки (поставщики и суммы по договорам поставки).
     purchases_qs = SupplierDocument.objects.select_related("supplier", "supply_contract", "request").filter(doc_date__range=(date_from, date_to))
     if user_role == RoleChoices.SITE_MANAGER:
         if site_name:
@@ -824,7 +819,6 @@ def report_summary_scoped_v2(filters: dict[str, Any], *, user=None) -> list[dict
     )
     grand_total_amount += section_total
 
-    # 6. Выданная спецодежда.
     ppe_qs = PPEIssuanceLine.objects.select_related("issuance", "material").filter(
         issuance__issue_date__range=(date_from, date_to),
         issuance__status__in=PPE_ISSUED_STATUSES,
@@ -1263,7 +1257,7 @@ REPORT_PROVIDERS = {
     "summary": report_summary_scoped_v2,
     "ppe": report_ppe_scoped,
     "movements": report_material_movements_scoped,
-    "site_material_report": report_stock,
+    "site_material_report": report_site_material,
     "consumption": report_material_consumption_scoped,
     "work_stats": report_work_statistics_scoped,
 }
