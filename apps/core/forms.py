@@ -690,7 +690,7 @@ class AuditLogFilterForm(DateRangeValidationMixin, BaseStyledForm, forms.Form):
 class MaterialForm(BaseStyledForm, forms.ModelForm):
     class Meta:
         model = Material
-        fields = ["code", "name", "unit", "price", "stock_reserve_qty", "category", "is_ppe"]
+        fields = ["code", "name", "unit", "stock_reserve_qty", "category", "is_ppe"]
         labels = {
             "code": "Код",
             "name": "Наименование",
@@ -699,7 +699,27 @@ class MaterialForm(BaseStyledForm, forms.ModelForm):
             "category": "Категория",
             "is_ppe": "СИЗ / спецодежда",
         }
+    def clean_code(self):
+        code = (self.cleaned_data.get("code") or "").strip()
+        if not code:
+            return code
+        existing = Material.objects.filter(code__iexact=code)
+        if self.instance.pk:
+            existing = existing.exclude(pk=self.instance.pk)
+        if existing.exists():
+            raise forms.ValidationError("Материал с таким кодом уже существует.")
+        return code
 
+    def clean_name(self):
+        name = (self.cleaned_data.get("name") or "").strip()
+        if not name:
+            return name
+        existing = Material.objects.filter(name__iexact=name)
+        if self.instance.pk:
+            existing = existing.exclude(pk=self.instance.pk)
+        if existing.exists():
+            raise forms.ValidationError("Материал с таким наименованием уже существует.")
+        return name
 
 class SupplierForm(BaseStyledForm, forms.ModelForm):
     class Meta:
@@ -769,7 +789,16 @@ class WorkerForm(BaseStyledForm, forms.ModelForm):
             "hire_date": "Дата приема",
         }
         widgets = {"hire_date": DateInput()}
-
+    def clean_employee_number(self):
+        employee_number = (self.cleaned_data.get("employee_number") or "").strip()
+        if not employee_number:
+            return employee_number
+        existing = Worker.objects.filter(employee_number__iexact=employee_number)
+        if self.instance.pk:
+            existing = existing.exclude(pk=self.instance.pk)
+        if existing.exists():
+            raise forms.ValidationError("Работник с таким табельным номером уже существует.")
+        return employee_number
 
 class MaterialNormForm(BaseStyledForm, forms.ModelForm):
     class Meta:
