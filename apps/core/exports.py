@@ -1,5 +1,5 @@
 ﻿from __future__ import annotations
- 
+
 import mimetypes
 import re
 from datetime import datetime
@@ -8,9 +8,9 @@ from pathlib import Path
 from typing import Any, Iterable
 from zipfile import ZIP_DEFLATED, ZipFile
 from xml.sax.saxutils import escape as xml_escape
- 
+
 from django.conf import settings
- 
+
 from .models import (
     DocumentRecord,
     PPEIssuance,
@@ -27,19 +27,20 @@ from .models import (
     WriteOffTemplateVariant,
 )
 from .reporting import REPORT_PROVIDERS
- 
- 
+
+
 def money(value: Any) -> str:
     numeric = float(value or 0)
     return f"{numeric:,.2f}".replace(",", " ").replace(".", ",")
- 
- 
+
+
 PLACEHOLDER_RE = re.compile(r"\{\{\s*([A-Z0-9_]+)\s*\}\}")
+CELL_REF_RE = re.compile(r'([A-Z]+)(\d+)')
 MONTH_NAMES = [
     "января", "февраля", "марта", "апреля", "мая", "июня",
     "июля", "августа", "сентября", "октября", "ноября", "декабря",
 ]
- 
+
 DOCX_TEMPLATE_FILES = {
     "smr_contract": "Договор на СМР_шаблон.docx",
     "supply_contract": "Договор поставки_шаблон.docx",
@@ -49,7 +50,7 @@ DOCX_TEMPLATE_FILES = {
     "write_off_production_economic": "Акт списания материалов на производственно-хозяйственные нужды_шаблон.docx",
     "work_acceptance": "Акт сдачи-приемки выполненных работ_шаблон.docx",
 }
- 
+
 PRIMARY_DOCUMENT_TEMPLATE_FILES = {
     "invoice": "Счет на материал_шаблон.docx",
     "invoice_facture": "Счет-фактура_шаблон.docx",
@@ -59,24 +60,24 @@ PRIMARY_DOCUMENT_TEMPLATE_FILES = {
     "receipt_invoice": "Товарная накладная ТОРГ-12_шаблон.docx",
     "payment_order": "Платежное поручение_шаблон.docx",
 }
- 
+
 PRIMARY_DOCUMENT_XLSX_TEMPLATE_FILES = {
     "invoice": "Счет на оплату_шаблон.xlsx",
 }
- 
+
 XLSX_TEMPLATE_FILES = {
     "site_material_report": "Материальный отчет_шаблон.xlsx",
 }
- 
- 
+
+
 def _load_xlsxwriter():
     try:
         import xlsxwriter
     except ImportError as exc:
         raise RuntimeError("Экспорт XLSX недоступен: пакет xlsxwriter не установлен или поврежден.") from exc
     return xlsxwriter
- 
- 
+
+
 def _load_docx_dependencies():
     try:
         from docx import Document
@@ -85,10 +86,10 @@ def _load_docx_dependencies():
     except ImportError as exc:
         raise RuntimeError("Экспорт DOCX недоступен: пакет python-docx или lxml не установлен либо поврежден.") from exc
     return Document, WD_ALIGN_PARAGRAPH, Pt
- 
- 
+
+
 class Exporter:
- 
+
     def _short_name(self, full_name: str) -> str:
         parts = (full_name or "").strip().split()
         if len(parts) >= 3:
@@ -96,7 +97,7 @@ class Exporter:
         elif len(parts) == 2:
             return f"{parts[1][0]}.{parts[0]}"
         return full_name or "________________"
- 
+
     def _warehouse_user_name(self) -> str:
         from .models import User, RoleChoices
         user = User.objects.filter(role=RoleChoices.WAREHOUSE, is_active=True).first()
@@ -197,16 +198,16 @@ class Exporter:
         path = self._doc_path("work_schedule", schedule.number)
         doc.save(path)
         return path
- 
+
     def content_type(self, path: Path) -> str:
         guessed, _ = mimetypes.guess_type(path.name)
         return guessed or "application/octet-stream"
- 
+
     def _template_path(self, template_name: str) -> Path | None:
         templates_dir = Path(getattr(settings, "DOCUMENT_TEMPLATES_DIR", ""))
         path = templates_dir / template_name
         return path if path.exists() else None
- 
+
     def _render_docx_template(self, template_name: str, context: dict[str, Any], path: Path) -> bool:
         template_path = self._template_path(template_name)
         if not template_path:
@@ -224,7 +225,7 @@ class Exporter:
                     data = replace_placeholders(data)
                 target.writestr(member, data)
         return True
- 
+
     def _render_docx_template_with_table_rows(
         self,
         template_name: str,
@@ -276,7 +277,7 @@ class Exporter:
                     data = replace_placeholders(data)
                 target.writestr(member, data)
         return True
- 
+
     def _render_docx_file_with_table_rows(
         self,
         source_path: Path,
@@ -327,7 +328,7 @@ class Exporter:
                     data = replace_placeholders(data)
                 target.writestr(member, data)
         return True
- 
+
     def _render_xlsx_template(self, template_name: str, context: dict[str, Any], path: Path) -> bool:
         template_path = self._template_path(template_name)
         if not template_path:
@@ -345,12 +346,140 @@ class Exporter:
                     data = replace_placeholders(data)
                 target.writestr(member, data)
         return True
- 
+
+    def _shift_ref(self, ref: str, delta: int) -> str:
+        match = CELL_REF_RE.match(ref)
+        if not match:
+            return ref
+        col, row = match.groups()
+        return f"{col}{int(row) + delta}"
+
+    def _render_xlsx_template_with_rows(
+        self,
+        template_name: str,
+        context: dict[str, Any],
+        path: Path,
+        *,
+        table_rows: list[dict[str, Any]],
+        template_row_number: int,
+    ) -> bool:
+        """
+        Рендерит xlsx-шаблон, в котором есть ровно одна строка-образец
+        (template_row_number) с плейсхолдерами вида {{KEY}}. Строка
+        размножается под фактическое количество table_rows, а все строки
+        ниже образца (например "Итого") автоматически сдвигаются вниз
+        вместе с merge-ячейками и диапазоном dimension.
+        """
+        template_path = self._template_path(template_name)
+        if not template_path:
+            return False
+
+        replacements = {k: "" if v is None else str(v) for k, v in context.items()}
+
+        with ZipFile(template_path, "r") as source:
+            names = source.namelist()
+            sheet_name = next(n for n in names if n.startswith("xl/worksheets/sheet") and n.endswith(".xml"))
+            sheet_xml = source.read(sheet_name).decode("utf-8")
+            shared_strings_name = "xl/sharedStrings.xml"
+            shared_xml = source.read(shared_strings_name).decode("utf-8") if shared_strings_name in names else None
+
+            shared_strings: list[str] = []
+            if shared_xml:
+                for si_match in re.finditer(r"<si>(.*?)</si>", shared_xml, re.DOTALL):
+                    t_match = re.search(r"<t[^>]*>(.*?)</t>", si_match.group(1), re.DOTALL)
+                    shared_strings.append(t_match.group(1) if t_match else "")
+
+            row_pattern = re.compile(rf'<row r="{template_row_number}"[^>]*>.*?</row>', re.DOTALL)
+            row_match = row_pattern.search(sheet_xml)
+            if not row_match:
+                return False
+            template_row_xml = row_match.group(0)
+            row_start, row_end = row_match.span()
+
+            def resolve_cell(m: re.Match) -> str:
+                attrs_before, attrs_after, idx = m.groups()
+                text = shared_strings[int(idx)]
+                return f'<c {attrs_before}t="str"{attrs_after}><v>{xml_escape(text)}</v></c>'
+
+            template_row_xml = re.sub(
+                r'<c ([^>]*?)t="s"([^>]*)><v>(\d+)</v></c>',
+                resolve_cell,
+                template_row_xml,
+            )
+
+            rows = table_rows or []
+            n = len(rows)
+            delta = n - 1
+
+            new_rows_xml = []
+            for i, row_data in enumerate(rows):
+                row_xml = re.sub(
+                    r'r="([A-Z]+\d+)"',
+                    lambda m: f'r="{self._shift_ref(m.group(1), i)}"',
+                    template_row_xml,
+                )
+                for key, value in row_data.items():
+                    marker = "{{" + key + "}}"
+                    row_xml = row_xml.replace(marker, xml_escape(str(value if value is not None else "")))
+                row_xml = PLACEHOLDER_RE.sub("", row_xml)
+                new_rows_xml.append(row_xml)
+
+            sheet_xml = sheet_xml[:row_start] + "".join(new_rows_xml) + sheet_xml[row_end:]
+
+            if delta != 0:
+                def shift_row_block(m: re.Match) -> str:
+                    row_num = int(m.group(1))
+                    if row_num <= template_row_number:
+                        return m.group(0)
+                    block = m.group(0)
+                    return re.sub(
+                        r'r="([A-Z]+\d+)"',
+                        lambda mm: f'r="{self._shift_ref(mm.group(1), delta)}"',
+                        block,
+                    )
+                sheet_xml = re.sub(r'<row r="(\d+)"[^>]*>.*?</row>', shift_row_block, sheet_xml, flags=re.DOTALL)
+
+                def shift_merge(m: re.Match) -> str:
+                    ref = m.group(1)
+                    start_ref, end_ref = ref.split(":")
+                    start_row = int(CELL_REF_RE.match(start_ref).group(2))
+                    if start_row <= template_row_number:
+                        return m.group(0)
+                    return f'mergeCell ref="{self._shift_ref(start_ref, delta)}:{self._shift_ref(end_ref, delta)}"'
+                sheet_xml = re.sub(r'mergeCell ref="([A-Z]+\d+:[A-Z]+\d+)"', shift_merge, sheet_xml)
+
+                dim_match = re.search(r'<dimension ref="([A-Z]+\d+):([A-Z]+\d+)"/>', sheet_xml)
+                if dim_match:
+                    start_ref, end_ref = dim_match.groups()
+                    end_col, end_row = CELL_REF_RE.match(end_ref).groups()
+                    new_end_row = int(end_row) + delta
+                    sheet_xml = sheet_xml.replace(
+                        dim_match.group(0),
+                        f'<dimension ref="{start_ref}:{end_col}{new_end_row}"/>',
+                    )
+
+            if shared_xml:
+                def replace_shared(m: re.Match) -> str:
+                    return PLACEHOLDER_RE.sub(lambda pm: xml_escape(replacements.get(pm.group(1), "")), m.group(0))
+                shared_xml = re.sub(r"<t[^>]*>.*?</t>", replace_shared, shared_xml, flags=re.DOTALL)
+
+            sheet_xml = PLACEHOLDER_RE.sub(lambda m: xml_escape(replacements.get(m.group(1), "")), sheet_xml)
+
+            with ZipFile(path, "w", ZIP_DEFLATED) as target:
+                for member in source.infolist():
+                    if member.filename == sheet_name:
+                        target.writestr(member, sheet_xml.encode("utf-8"))
+                    elif member.filename == shared_strings_name and shared_xml is not None:
+                        target.writestr(member, shared_xml.encode("utf-8"))
+                    else:
+                        target.writestr(member, source.read(member.filename))
+        return True
+
     def _date_text(self, value: Any) -> str:
         if not value:
             return ""
         return value.strftime("%d.%m.%Y") if hasattr(value, "strftime") else str(value)
- 
+
     def _date_parts(self, prefix: str, value: Any) -> dict[str, str]:
         if not value or not hasattr(value, "month"):
             return {f"{prefix}_DAY": "", f"{prefix}_MONTH": "", f"{prefix}_YEAR": ""}
@@ -359,7 +488,7 @@ class Exporter:
             f"{prefix}_MONTH": MONTH_NAMES[value.month - 1],
             f"{prefix}_YEAR": str(value.year),
         }
- 
+
     def _duration_days(self, start_date: Any, end_date: Any) -> str:
         if not start_date or not end_date:
             return ""
@@ -367,7 +496,7 @@ class Exporter:
             return str((end_date - start_date).days + 1)
         except TypeError:
             return ""
- 
+
     def _template_common_context(self) -> dict[str, str]:
         profile = self._organization_profile()
         organization_name = profile["name"] or "АО «СТ-1»"
@@ -393,19 +522,19 @@ class Exporter:
             "SUPPLIER_AUTH_DOC": "доверенности",
             "JURISDICTION_PARTY": organization_name,
         }
- 
+
     def _add_line_context(self, context: dict[str, Any], lines: Iterable[Any], mapper, *, limit: int = 12) -> None:
         for index, line in enumerate(list(lines)[:limit], start=1):
             suffix = "" if index == 1 else f"_{index}"
             for key, value in mapper(line, index).items():
                 context[f"{key}{suffix}"] = value
- 
+
     def _line_amount(self, line: Any) -> Decimal:
         return Decimal(line.quantity or 0) * Decimal(line.unit_price or 0)
- 
+
     def _xlsx_path(self, prefix: str, date_from: Any, date_to: Any) -> Path:
         return settings.EXPORTS_DIR / f"{prefix}_{date_from}_{date_to}.xlsx"
- 
+
     def _site_material_report_template_context(self, rows: list[dict[str, Any]], filters: dict[str, Any], *, user=None) -> dict[str, Any]:
         date_from = filters.get("date_from") or datetime.now().date().replace(day=1)
         date_to = filters.get("date_to") or datetime.now().date()
@@ -432,23 +561,24 @@ class Exporter:
             "TOTAL_CLOSING": total_closing,
             "TOTAL_AMOUNT": total_amount,
         }
-        for index, row in enumerate(detail_rows[:12], start=1):
-            suffix = "" if index == 1 else f"_{index}"
-            context.update({
-                f"LINE_NO{suffix}": index,
-                f"MATERIAL_CODE{suffix}": row.get("Код материала", ""),
-                f"MATERIAL_NAME{suffix}": row.get("Наименование материала", ""),
-                f"UNIT{suffix}": row.get("Ед. изм.", ""),
-                f"OPENING_QTY{suffix}": row.get("Остаток на начало", ""),
-                f"RECEIPT_QTY{suffix}": row.get("Поступило за период", ""),
-                f"ISSUE_QTY{suffix}": row.get("Израсходовано за период", ""),
-                f"CLOSING_QTY{suffix}": row.get("Остаток на конец", ""),
-                f"PRICE{suffix}": row.get("Цена за единицу", ""),
-                f"CLOSING_AMOUNT{suffix}": row.get("Сумма остатка", ""),
-                f"BASIS_DOCUMENT{suffix}": row.get("Период", ""),
+        lines_data = []
+        for index, row in enumerate(detail_rows, start=1):
+            lines_data.append({
+                "LINE_NO": str(index),
+                "MATERIAL_CODE": row.get("Код материала", ""),
+                "MATERIAL_NAME": row.get("Наименование материала", ""),
+                "UNIT": row.get("Ед. изм.", ""),
+                "OPENING_QTY": row.get("Остаток на начало", ""),
+                "RECEIPT_QTY": row.get("Поступило за период", ""),
+                "ISSUE_QTY": row.get("Израсходовано за период", ""),
+                "CLOSING_QTY": row.get("Остаток на конец", ""),
+                "PRICE": row.get("Цена за единицу", ""),
+                "CLOSING_AMOUNT": row.get("Сумма остатка", ""),
+                "BASIS_DOCUMENT": row.get("Период", ""),
             })
+        context["__lines_data__"] = lines_data
         return context
- 
+
     def export_document(self, entity_type: str, entity_id: int) -> Path:
         handlers = {
             "smr_contract": self._export_smr_contract,
@@ -469,7 +599,7 @@ class Exporter:
         path = handlers[entity_type](entity_id)
         DocumentRecord.objects.filter(entity_type=entity_type, entity_id=entity_id).update(file_path=str(path))
         return path
- 
+
     def export_report(self, report_name: str, filters: dict[str, Any], *, user=None) -> Path:
         provider = REPORT_PROVIDERS[report_name]
         rows = provider(filters, user=user)
@@ -477,12 +607,14 @@ class Exporter:
         date_to = filters.get("date_to") or datetime.now().date()
         path = self._xlsx_path(report_name, date_from, date_to)
         template_name = XLSX_TEMPLATE_FILES.get(report_name)
-        if template_name and self._render_xlsx_template(
-            template_name,
-            self._site_material_report_template_context(rows, filters, user=user),
-            path,
-        ):
-            return path
+        if template_name:
+            context = self._site_material_report_template_context(rows, filters, user=user)
+            lines_data = context.pop("__lines_data__", [])
+            if self._render_xlsx_template_with_rows(
+                template_name, context, path,
+                table_rows=lines_data, template_row_number=7,
+            ):
+                return path
         xlsxwriter = _load_xlsxwriter()
         workbook = xlsxwriter.Workbook(str(path))
         worksheet = workbook.add_worksheet("Отчет")
@@ -525,17 +657,17 @@ class Exporter:
             worksheet.write("A4", "Нет данных за выбранный период.")
         workbook.close()
         return path
- 
+
     def _export_path(self, prefix: str, number: str, extension: str) -> Path:
         safe_number = number.replace("/", "_").replace("\\", "_").replace(" ", "_")
         return settings.EXPORTS_DIR / f"{prefix}_{safe_number}.{extension}"
- 
+
     def _doc_path(self, prefix: str, number: str) -> Path:
         return self._export_path(prefix, number, "docx")
- 
+
     def _xlsx_document_path(self, prefix: str, number: str) -> Path:
         return self._export_path(prefix, number, "xlsx")
- 
+
     def _prepare_doc(self, title: str, subtitle: str = ""):
         Document, WD_ALIGN_PARAGRAPH, Pt = _load_docx_dependencies()
         document = Document()
@@ -553,24 +685,24 @@ class Exporter:
             subtitle_paragraph.add_run(subtitle).italic = True
         document.add_paragraph()
         return document
- 
+
     def _add_meta(self, document, items: Iterable[tuple[str, str]]) -> None:
         for label, value in items:
             paragraph = document.add_paragraph()
             paragraph.add_run(f"{label}: ").bold = True
             paragraph.add_run(value)
- 
+
     def _add_heading(self, document, text: str) -> None:
         paragraph = document.add_paragraph()
         run = paragraph.add_run(text)
         run.bold = True
         run.font.size = _load_docx_dependencies()[2](12)
- 
+
     def _add_clause(self, document, number: str, text: str) -> None:
         paragraph = document.add_paragraph()
         paragraph.add_run(f"{number}. ").bold = True
         paragraph.add_run(text)
- 
+
     def _add_table(self, document, headers: list[str], rows: list[list[str]]) -> None:
         table = document.add_table(rows=1, cols=len(headers))
         table.style = "Table Grid"
@@ -580,7 +712,7 @@ class Exporter:
             cells = table.add_row().cells
             for index, value in enumerate(row):
                 cells[index].text = value
- 
+
     def _add_signature(self, document, left_label: str, right_label: str) -> None:
         document.add_paragraph()
         table = document.add_table(rows=1, cols=2)
@@ -626,7 +758,7 @@ class Exporter:
         # Строка 2: черточка / ФИО
         table.cell(1, 0).text = f"_____________________ / {left_name} /"
         table.cell(1, 1).text = f"_____________________ / {right_name} /"
- 
+
     def _organization_profile(self) -> dict[str, str]:
         from .models import OrganizationProfile
         profile = OrganizationProfile.get()
@@ -649,10 +781,10 @@ class Exporter:
             "corr_account": profile.corr_account,
             "okpo": profile.okpo,
         }
- 
+
     def _organization_name(self) -> str:
         return self._organization_profile()["name"]
- 
+
     def _organization_requisites(self) -> str:
         profile = self._organization_profile()
         if profile["requisites"]:
@@ -669,18 +801,18 @@ class Exporter:
         if profile["bank_details"]:
             parts.append(profile["bank_details"])
         return "; ".join(part for part in parts if part)
- 
+
     def _supplier_requisites(self, supplier) -> str:
         if hasattr(supplier, "requisites_text"):
             return supplier.requisites_text()
         return ""
- 
+
     def _extract_requisite(self, text: str, pattern: str) -> str:
         if not text:
             return ""
         match = re.search(pattern, text, flags=re.IGNORECASE)
         return match.group(1).strip() if match else ""
- 
+
     def _smr_contract_template_context(self, contract: SMRContract) -> dict[str, Any]:
         object_name = contract.object.name if contract.object else ""
         vat_amount = Decimal(contract.amount or 0) * Decimal(contract.vat_rate or 0) / Decimal("100")
@@ -771,7 +903,7 @@ class Exporter:
             })
         context["__act_work_lines_data__"] = act_work_lines_data
         return context
- 
+
     def _supply_contract_template_context(self, contract: SupplyContract) -> dict[str, Any]:
         vat_rate = Decimal("20")
         vat_amount = Decimal(contract.amount or 0) * vat_rate / Decimal("100")
@@ -806,7 +938,7 @@ class Exporter:
             "LEFT_SIGNER_NAME": self._short_name(supplier_contact) if supplier_contact else contract.supplier.name,
             "RIGHT_SIGNER_NAME": self._short_name(buyer_signer) if buyer_signer else buyer_name,
         }
- 
+
     def _primary_document_template_context(self, item: PrimaryDocument) -> dict[str, Any]:
         lines = list(item.lines.all())
         total_amount = Decimal(item.amount or 0)
@@ -953,7 +1085,7 @@ class Exporter:
             }
         self._add_line_context(context, lines, map_line)
         return context
- 
+
     def _stock_receipt_template_context(self, receipt: StockReceipt) -> dict[str, Any]:
         profile = self._organization_profile()
         lines = list(receipt.lines.all())
@@ -998,7 +1130,7 @@ class Exporter:
             }
         self._add_line_context(context, lines, map_line)
         return context
- 
+
     def _stock_issue_template_context(self, issue: StockIssue) -> dict[str, Any]:
         from .models import User, RoleChoices
         lines = list(issue.lines.all())
@@ -1038,7 +1170,7 @@ class Exporter:
             }
         self._add_line_context(context, lines, map_line)
         return context
- 
+
     def _writeoff_template_context(self, act: WriteOffAct) -> dict[str, Any]:
         from .models import User, RoleChoices
         director = User.objects.filter(role=RoleChoices.DIRECTOR).first()
@@ -1059,7 +1191,7 @@ class Exporter:
             "SITE_MANAGER_NAME": self._short_name(site_manager.full_name_or_username) if site_manager else "________________",
         }
         return context
- 
+
     def _ppe_template_context(self, issuance: PPEIssuance) -> dict[str, Any]:
         issued_by_name = issuance.issued_by.full_name_or_username if issuance.issued_by_id else ""
         confirmed_by_name = issuance.confirmed_by.full_name_or_username if issuance.confirmed_by_id else ""
@@ -1075,7 +1207,7 @@ class Exporter:
             "RIGHT_SIGNER_NAME": self._short_name(issued_by_name) if issued_by_name else "________________",
         }
         return context
- 
+
     def _work_acceptance_template_context(self, act: WorkAcceptanceAct) -> dict[str, Any]:
         vat_rate = Decimal(act.contract.vat_rate or 0)
         vat_amount = Decimal(act.amount or 0) * vat_rate / Decimal("100")
@@ -1112,7 +1244,7 @@ class Exporter:
             "CONTRACTOR_SIGNER_POSITION": profile.get("contractor_signer_position") or "представителя",
             "CONTRACTOR_AUTH_DOC": profile.get("contractor_auth_doc") or "доверенности",
         }
- 
+
     def _supplier_document_template_name(self, doc_type: str) -> str | None:
         normalized = doc_type.casefold()
         if "счет-фактура" in normalized or "счёт-фактура" in normalized:
@@ -1122,7 +1254,7 @@ class Exporter:
         if "счет" in normalized or "счёт" in normalized:
             return "Счет на оплату по скану_шаблон.docx"
         return None
- 
+
     def _export_smr_contract(self, entity_id: int) -> Path:
         contract = SMRContract.objects.select_related("object").get(pk=entity_id)
         path = self._doc_path("smr_contract", contract.number)
@@ -1171,7 +1303,7 @@ class Exporter:
         self._add_signature(doc, f"Заказчик: {customer_name}", f"Подрядчик: {contractor_name}")
         doc.save(path)
         return path
- 
+
     def _export_supply_contract(self, entity_id: int) -> Path:
         contract = SupplyContract.objects.select_related("supplier", "related_smr_contract").get(pk=entity_id)
         path = self._doc_path("supply_contract", contract.number)
@@ -1194,7 +1326,7 @@ class Exporter:
         self._add_signature(doc, f"Поставщик: {contract.supplier.name}", f"Покупатель: {buyer_name}")
         doc.save(path)
         return path
- 
+
     def _export_site_material_request(self, entity_id: int) -> Path:
         from .models import User, RoleChoices
         request = SiteMaterialRequest.objects.select_related("contract", "requested_by").prefetch_related("lines__material").get(pk=entity_id)
@@ -1235,7 +1367,7 @@ class Exporter:
         path = self._doc_path("site_material_request", request.number)
         doc.save(path)
         return path
- 
+
     def _export_procurement_request(self, entity_id: int) -> Path:
         request = ProcurementRequest.objects.select_related("contract", "site_request", "supplier", "requested_by").prefetch_related("lines__material").get(pk=entity_id)
         doc = self._prepare_doc("ЗАЯВКА НА ЗАКУПКУ МАТЕРИАЛОВ", f"№ {request.number} от {request.request_date}")
@@ -1280,7 +1412,7 @@ class Exporter:
         path = self._doc_path("procurement_request", request.number)
         doc.save(path)
         return path
- 
+
     def _export_primary_document(self, entity_id: int) -> Path:
         item = (
             PrimaryDocument.objects.select_related("document_type", "supplier", "procurement_request", "supply_contract", "stock_receipt")
@@ -1343,7 +1475,7 @@ class Exporter:
         self._add_signature(doc, f"Поставщик: {item.supplier.name}", f"Получатель: {receiver_name}")
         doc.save(path)
         return path
- 
+
     def _export_stock_receipt(self, entity_id: int) -> Path:
         receipt = StockReceipt.objects.select_related("supplier", "supplier_document", "primary_document").prefetch_related("lines__material").get(pk=entity_id)
         path = self._doc_path("stock_receipt", receipt.number)
@@ -1403,7 +1535,7 @@ class Exporter:
         self._add_signature(doc, "Кладовщик", "Материально ответственное лицо")
         doc.save(path)
         return path
- 
+
     def _export_stock_issue(self, entity_id: int) -> Path:
         issue = StockIssue.objects.select_related("contract", "site_request", "stock_receipt").prefetch_related("lines__material").get(pk=entity_id)
         path = self._doc_path("stock_issue", issue.number)
@@ -1449,7 +1581,7 @@ class Exporter:
         self._add_signature(doc, "Кладовщик", "Начальник участка")
         doc.save(path)
         return path
- 
+
     def _export_writeoff(self, entity_id: int) -> Path:
         act = WriteOffAct.objects.select_related("contract__object").prefetch_related("lines__material").get(pk=entity_id)
         path = self._doc_path("write_off", act.number)
@@ -1504,7 +1636,7 @@ class Exporter:
         self._add_signature(doc, "Начальник участка", "Начальник монтажного объекта")
         doc.save(path)
         return path
- 
+
     def _export_work_acceptance(self, entity_id: int) -> Path:
         act = WorkAcceptanceAct.objects.select_related("contract__object").get(pk=entity_id)
         path = self._doc_path("work_acceptance", act.number)
@@ -1528,7 +1660,7 @@ class Exporter:
         self._add_signature(doc, f"Заказчик: {customer_name}", f"Подрядчик: {contractor_name}")
         doc.save(path)
         return path
- 
+
     def _export_ppe_issuance(self, entity_id: int) -> Path:
         issuance = PPEIssuance.objects.select_related("issued_by", "confirmed_by").prefetch_related("lines__worker", "lines__material").get(pk=entity_id)
         path = self._doc_path("ppe_issuance", issuance.number)
@@ -1599,7 +1731,7 @@ class Exporter:
         self._add_signature(doc, "Материально ответственное лицо", "Начальник участка")
         doc.save(path)
         return path
- 
+
     def _export_supplier_document(self, entity_id: int) -> Path:
         item = SupplierDocument.objects.select_related("supplier", "request", "supply_contract").get(pk=entity_id)
         path = self._doc_path("supplier_document", item.doc_number)
