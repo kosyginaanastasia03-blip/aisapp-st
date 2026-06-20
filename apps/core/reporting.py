@@ -406,10 +406,6 @@ def report_writeoffs(filters: dict[str, Any], *, user=None) -> list[dict[str, An
         qs = qs.filter(act__site_name__icontains=location_name)
 
     lines = list(qs.order_by("-act__act_date", "act__contract__object__name", "material__code"))
-    object_totals: dict[str, Decimal] = defaultdict(lambda: Decimal("0"))
-    for line in lines:
-        object_name = line.act.contract.object.name if line.act.contract.object else "Без объекта"
-        object_totals[object_name] += _to_decimal(line.actual_quantity)
 
     rows: list[dict[str, Any]] = []
     total_quantity = Decimal("0")
@@ -437,7 +433,6 @@ def report_writeoffs(filters: dict[str, Any], *, user=None) -> list[dict[str, An
                 "Сумма списания": _to_float(line_amount),
                 "Акт списания №": line.act.number,
                 "Дата акта": line.act.act_date.isoformat(),
-                "Итого по объекту (кол-во)": _to_float(object_totals[object_name]),
             }
         )
         total_quantity += actual_quantity
@@ -461,7 +456,6 @@ def report_writeoffs(filters: dict[str, Any], *, user=None) -> list[dict[str, An
                 "Сумма списания": _to_float(total_amount),
                 "Акт списания №": "",
                 "Дата акта": "",
-                "Итого по объекту (кол-во)": "",
             }
         )
     return rows
@@ -992,15 +986,12 @@ def report_material_movements_scoped(filters: dict[str, Any], *, user=None) -> l
     rows: list[dict[str, Any]] = []
     total_incoming = Decimal("0")
     total_outgoing = Decimal("0")
-    total_amount = Decimal("0")
     for movement in qs.order_by("-movement_date", "-id"):
         quantity = _to_decimal(movement.quantity_delta)
-        amount = quantity * _to_decimal(movement.unit_price)
         if quantity >= 0:
             total_incoming += quantity
         else:
             total_outgoing += abs(quantity)
-        total_amount += amount
         rows.append(
             {
                 "Период": period,
@@ -1011,8 +1002,6 @@ def report_material_movements_scoped(filters: dict[str, Any], *, user=None) -> l
                 "Тип операции": _movement_label(movement.source_type),
                 "Количество (+/-)": _to_float(quantity),
                 "Ед. изм.": movement.material.unit,
-                "Цена за единицу": _to_float(movement.unit_price),
-                "Сумма операции": _to_float(amount),
                 "Ответственный": movement.created_by.full_name_or_username,
             }
         )
@@ -1028,8 +1017,6 @@ def report_material_movements_scoped(filters: dict[str, Any], *, user=None) -> l
                 "Тип операции": f"Приход: {_to_float(total_incoming)}; Расход: {_to_float(total_outgoing)}",
                 "Количество (+/-)": _to_float(total_incoming - total_outgoing),
                 "Ед. изм.": "",
-                "Цена за единицу": "",
-                "Сумма операции": _to_float(total_amount),
                 "Ответственный": "",
             }
         )
