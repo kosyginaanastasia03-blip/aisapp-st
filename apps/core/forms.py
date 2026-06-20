@@ -984,6 +984,17 @@ class UserForm(BaseStyledForm, forms.ModelForm):
             self.fields["password1"].help_text = "Укажите пароль для новой учетной записи."
             self.fields["password2"].help_text = "Повторите пароль."
 
+    def clean_username(self):
+        username = (self.cleaned_data.get("username") or "").strip()
+        if not username:
+            return username
+        existing = User.objects.filter(username__iexact=username)
+        if self.instance.pk:
+            existing = existing.exclude(pk=self.instance.pk)
+        if existing.exists():
+            raise forms.ValidationError("Пользователь с таким логином уже существует. Выберите другой логин.")
+        return username
+
     def clean(self):
         cleaned_data = super().clean()
         role = cleaned_data.get("role")

@@ -1383,7 +1383,8 @@ def catalog_page(request: HttpRequest, slug: str) -> HttpResponse:
         "is_editing": instance is not None,
         "current_catalog": slug,
         "created_export_url": _created_export_url(request, config, queryset),
-        "work_type_choices": work_type_choices,  # ← ДОБАВЬ ЭТУ СТРОКУ
+        "work_type_choices": work_type_choices,
+        "material_catalog": _material_catalog() if slug == "norms" else [],
     }
     return _render(request, "core/catalogs.html", context)
 

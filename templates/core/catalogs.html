@@ -327,4 +327,37 @@
     loadRows();
 })();
 </script>
+{{ material_catalog|json_script:"material-catalog-data" }}
+<script>
+(() => {
+    const form = document.querySelector("#workspace-form form");
+    if (!form) return;
+    const materialSelect = form.querySelector('select[name="material"]');
+    const unitInput = form.querySelector('input[name="unit"]');
+    if (!materialSelect || !unitInput) return;
+    const catalogNode = document.getElementById("material-catalog-data");
+    if (!catalogNode) return;
+    let materialCatalog = [];
+    try {
+        const parsed = JSON.parse(catalogNode.textContent || "[]");
+        materialCatalog = Array.isArray(parsed) ? parsed : [];
+    } catch (_error) {
+        materialCatalog = [];
+    }
+    const normalizeCode = (value) => String(value || "").trim().toUpperCase();
+    const materialByCode = new Map(materialCatalog.map((item) => [normalizeCode(item.code), item]));
+    const fillUnit = () => {
+        const selectedOption = materialSelect.options[materialSelect.selectedIndex];
+        if (!selectedOption || !selectedOption.value) return;
+        const optionText = selectedOption.textContent || "";
+        const code = optionText.split(" - ")[0].trim();
+        const material = materialByCode.get(normalizeCode(code));
+        if (material && material.unit) {
+            unitInput.value = material.unit;
+        }
+    };
+    materialSelect.addEventListener("change", fillUnit);
+    if (materialSelect.value) fillUnit();
+})();
+</script>
 {% endblock %}
