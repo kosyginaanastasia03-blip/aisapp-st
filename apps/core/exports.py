@@ -1113,7 +1113,7 @@ class Exporter:
             "RECEIVER_UNIT": issue.site_name,
             "SENDER_ACTIVITY": "склад",
             "RECEIVER_ACTIVITY": "строительно-монтажные работы",
-            "RECEIVED_BY_NAME": self._short_name(issue.received_by_name) if issue.received_by_name else "",
+            "RECEIVED_BY_NAME": self._last_name_initials(issue.received_by_name) if issue.received_by_name else "",
             "RECEIVED_BY_POSITION": f"Начальник участка {issue.site_name}",
             "ISSUED_BY_POSITION": "Кладовщик",
             "OPERATION_CODE": "",
@@ -1121,11 +1121,11 @@ class Exporter:
             "ACCOUNT_CODE": "",
             "STOCK_RECEIPT_NUMBER": issue.stock_receipt.number if issue.stock_receipt else "",
             "STOCK_RECEIPT_DATE": self._date_text(issue.stock_receipt.receipt_date) if issue.stock_receipt else "",
-            "THROUGH_WHOM": self._short_name(issue.issued_by.full_name_or_username) if issue.issued_by_id else "",
-            "REQUESTED_BY_NAME": self._short_name(issue.received_by_name) if issue.received_by_name else "",
-            "APPROVED_BY_NAME": self._short_name(director.full_name_or_username) if director else "",
-            "LEFT_SIGNER_NAME": self._short_name(issue.issued_by.full_name_or_username) if issue.issued_by_id else "",
-            "RIGHT_SIGNER_NAME": self._short_name(issue.received_by_name) if issue.received_by_name else "",
+            "THROUGH_WHOM": self._last_name_initials(issue.issued_by.full_name_or_username) if issue.issued_by_id else "",
+            "REQUESTED_BY_NAME": self._last_name_initials(issue.received_by_name) if issue.received_by_name else "",
+            "APPROVED_BY_NAME": self._last_name_initials(director.full_name_or_username) if director else "",
+            "LEFT_SIGNER_NAME": self._last_name_initials(issue.issued_by.full_name_or_username) if issue.issued_by_id else "",
+            "RIGHT_SIGNER_NAME": self._last_name_initials(issue.received_by_name) if issue.received_by_name else "",
         }
         def map_line(line, index: int) -> dict[str, Any]:
             return {

@@ -1,6 +1,7 @@
 
 from __future__ import annotations
- 
+
+import math
 import json
 from datetime import date, timedelta
 from decimal import Decimal
@@ -2009,6 +2010,9 @@ def create_writeoff(*, user, cleaned_data: dict[str, Any], ip_address: str | Non
         notes=cleaned_data.get("notes", ""),
     )
  
+    material_totals_rounded: dict[int, Decimal] = {}
+    material_info: dict[int, dict] = {}
+
     for line_data in prepared_lines:
         kind = line_data[0]
         if kind == "economic":
@@ -2021,26 +2025,42 @@ def create_writeoff(*, user, cleaned_data: dict[str, Any], ip_address: str | Non
             norm_per_unit = norm.norm_per_unit
             notes = f"{line_work_type}: {norm.notes}" if norm.notes else line_work_type
             movement_note = f"Списание по акту: {line_work_type}"
- 
+
+        mid = material.id
+        if mid not in material_totals_rounded:
+            material_totals_rounded[mid] = Decimal("0")
+            material_info[mid] = {
+                "material": material,
+                "norm_per_unit": norm_per_unit,
+                "notes": notes,
+                "movement_note": movement_note,
+            }
+        material_totals_rounded[mid] += quantity
+
+    for mid, total_qty in material_totals_rounded.items():
+        rounded_qty = Decimal(math.ceil(float(total_qty)))
+        info = material_info[mid]
+        material = info["material"]
+
         WriteOffLine.objects.create(
             act=act,
             material=material,
-            norm_per_unit=norm_per_unit,
-            calculated_quantity=quantity,
-            actual_quantity=quantity,
+            norm_per_unit=info["norm_per_unit"],
+            calculated_quantity=rounded_qty,
+            actual_quantity=rounded_qty,
             unit_price=material.price,
-            notes=notes,
+            notes=info["notes"],
         )
         StockMovement.objects.create(
             movement_date=act.act_date,
             material=material,
-            quantity_delta=-quantity,
+            quantity_delta=-rounded_qty,
             location_name=act.site_name,
             source_type="write_off",
             source_id=act.id,
             unit_price=material.price,
             created_by=user,
-            notes=movement_note,
+            notes=info["movement_note"],
             contract=act.contract,
         )
  
