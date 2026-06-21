@@ -1780,6 +1780,7 @@ class Exporter:
             buyer_name = self._organization_name() or "-"
             buyer_requisites = self._organization_requisites() or "-"
             uploaded_by_name = item.uploaded_by.full_name_or_username if item.uploaded_by_id else ""
+            org_profile = self._organization_profile()
 
             # Определяем подписантов в зависимости от типа документа
             _supplier_signer = self._short_name(item.supplier.contact_person) if item.supplier.contact_person else item.supplier.name
@@ -1801,6 +1802,7 @@ class Exporter:
                 "BANK_CORR_ACCOUNT": self._extract_requisite(supplier_requisites, r"(?:к/с|корр\.?\s*счет|корреспондентский\s+счет)\s*[:№#-]?\s*([0-9]{20})"),
                 "SUPPLIER_INN": item.supplier.tax_id or "",
                 "SUPPLIER_KPP": self._extract_requisite(supplier_requisites, r"КПП\s*[:№#-]?\s*([0-9]{9})"),
+                "SUPPLIER_ADDRESS": item.supplier.address or "",
                 "INVOICE_DATE": self._date_text(item.doc_date),
                 "INVOICE_FACTURE_NUMBER": item.doc_number,
                 "INVOICE_FACTURE_DATE": self._date_text(item.doc_date),
@@ -1813,6 +1815,9 @@ class Exporter:
                 "SUPPLIER_REQUISITES": supplier_requisites,
                 "SHIPPER_REQUISITES": supplier_requisites,
                 "BUYER_NAME": buyer_name,
+                "BUYER_INN": org_profile.get("tax_id") or "",
+                "BUYER_KPP": org_profile.get("kpp") or "",
+                "BUYER_ADDRESS": org_profile.get("address") or "",
                 "CONSIGNEE_NAME": buyer_name,
                 "CONSIGNEE_NAME_ADDRESS": buyer_name,
                 "CONSIGNEE_REQUISITES": buyer_requisites,
@@ -1833,6 +1838,8 @@ class Exporter:
                 "TOTAL_AMOUNT_WITH_VAT": money(item.amount),
                 "LEFT_SIGNER_NAME": _left_signer,
                 "RIGHT_SIGNER_NAME": _right_signer,
+                "SUPPLY_CONTRACT_NUMBER": item.supply_contract.number if item.supply_contract else "",
+                "SUPPLY_CONTRACT_DATE": self._date_text(item.supply_contract.contract_date) if item.supply_contract else "",
             }
             if lines_data:
                 if self._render_docx_template_with_table_rows(
