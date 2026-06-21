@@ -94,6 +94,7 @@ def _load_docx_dependencies():
 class Exporter:
 
     def _short_name(self, full_name: str) -> str:
+        """Возвращает формат И.О.Фамилия"""
         parts = (full_name or "").strip().split()
         if len(parts) >= 3:
             return f"{parts[1][0]}.{parts[2][0]}.{parts[0]}"
@@ -101,11 +102,20 @@ class Exporter:
             return f"{parts[1][0]}.{parts[0]}"
         return full_name or "________________"
 
+    def _last_name_initials(self, full_name: str) -> str:
+        """Возвращает формат Фамилия И.О. (для комиссии в актах)"""
+        parts = (full_name or "").strip().split()
+        if len(parts) >= 3:
+            return f"{parts[0]} {parts[1][0]}.{parts[2][0]}."
+        elif len(parts) == 2:
+            return f"{parts[0]} {parts[1][0]}."
+        return full_name or "________________"
+
     def _warehouse_user_name(self) -> str:
         from .models import User, RoleChoices
         user = User.objects.filter(role=RoleChoices.WAREHOUSE, is_active=True).first()
         return user.full_name_or_username if user else "________________"
-    
+
     def _export_work_schedule(self, entity_id: int) -> Path:
         from .models import WorkSchedule
         Document, WD_ALIGN_PARAGRAPH, Pt = _load_docx_dependencies()
@@ -359,15 +369,6 @@ class Exporter:
         table_rows: list[dict[str, Any]],
         template_row_number: int,
     ) -> bool:
-        """
-        Рендерит xlsx-шаблон через openpyxl: в шаблоне есть ровно одна
-        строка-образец (template_row_number) с плейсхолдерами {{KEY}}.
-        Строка размножается под фактическое количество table_rows, стиль
-        копируется, а строки ниже образца (например "Итого") и связанные
-        с ними merge-диапазоны автоматически сдвигаются.
-        Использование openpyxl вместо ручной правки OOXML гарантирует
-        валидность файла для Excel (файл не "лечится"/не повреждается).
-        """
         template_path = self._template_path(template_name)
         if not template_path:
             return False
@@ -477,6 +478,8 @@ class Exporter:
             "DIRECTOR_NAME": "________________",
             "RESPONSIBLE_PERSON_NAME": "________________",
             "SITE_MANAGER_NAME": "________________",
+            "SITE_MANAGER_NAME_SHORT": "________________",
+            "RESPONSIBLE_PERSON_NAME_SHORT": "________________",
             "LEFT_SIGNER_NAME": "________________",
             "RIGHT_SIGNER_NAME": "________________",
             "CONTRACTOR_SIGNER_NAME": "________________",
@@ -713,7 +716,6 @@ class Exporter:
         document.add_paragraph()
         table = document.add_table(rows=2, cols=2)
         table.style = "Table Grid"
-        # Убираем границы
         tbl = table._tbl
         tblPr = tbl.tblPr
         tblBorders = OxmlElement("w:tblBorders")
@@ -722,10 +724,8 @@ class Exporter:
             border.set(qn("w:val"), "none")
             tblBorders.append(border)
         tblPr.append(tblBorders)
-        # Строка 1: должность
         table.cell(0, 0).text = left_label
         table.cell(0, 1).text = right_label
-        # Строка 2: черточка / ФИО
         table.cell(1, 0).text = f"_____________________ / {left_name} /"
         table.cell(1, 1).text = f"_____________________ / {right_name} /"
 
@@ -1157,8 +1157,12 @@ class Exporter:
             "CONTRACT_SUBJECT": act.contract.subject if act.contract else "",
             "CONTRACT_WORK_COLUMN": act.work_type,
             "DIRECTOR_NAME": self._short_name(director.full_name_or_username) if director else "________________",
-            "RESPONSIBLE_PERSON_NAME": self._short_name(director.full_name_or_username) if director else "________________",
-            "SITE_MANAGER_NAME": self._short_name(site_manager.full_name_or_username) if site_manager else "________________",
+            # Комиссия: Фамилия И.О. (начальник участка — и как нач.участка, и как МОЛ)
+            "SITE_MANAGER_NAME": self._last_name_initials(site_manager.full_name_or_username) if site_manager else "________________",
+            "RESPONSIBLE_PERSON_NAME": self._last_name_initials(site_manager.full_name_or_username) if site_manager else "________________",
+            # Подписи внизу: И.О.Фамилия
+            "SITE_MANAGER_NAME_SHORT": self._short_name(site_manager.full_name_or_username) if site_manager else "________________",
+            "RESPONSIBLE_PERSON_NAME_SHORT": self._short_name(site_manager.full_name_or_username) if site_manager else "________________",
         }
         return context
 
@@ -1782,14 +1786,11 @@ class Exporter:
             uploaded_by_name = item.uploaded_by.full_name_or_username if item.uploaded_by_id else ""
             org_profile = self._organization_profile()
 
-            # Определяем подписантов в зависимости от типа документа
             _supplier_signer = self._short_name(item.supplier.contact_person) if item.supplier.contact_person else item.supplier.name
             if "наклад" in normalized_doc_type or "упд" in normalized_doc_type:
-                # Товарная накладная / УПД: отпуск разрешил поставщик, получил кладовщик
                 _left_signer = _supplier_signer
                 _right_signer = _warehouse_short
             else:
-                # Счёт / счёт-фактура: оба подписанта со стороны поставщика
                 _left_signer = _supplier_signer
                 _right_signer = self._short_name(uploaded_by_name) if uploaded_by_name else _supplier_signer
 
