@@ -1787,6 +1787,7 @@ class Exporter:
             org_profile = self._organization_profile()
 
             _supplier_signer = self._short_name(item.supplier.contact_person) if item.supplier.contact_person else item.supplier.name
+            _supplier_is_ip = len((item.supplier.tax_id or "").strip()) == 12
             if "наклад" in normalized_doc_type or "упд" in normalized_doc_type:
                 _left_signer = _supplier_signer
                 _right_signer = _warehouse_short
@@ -1839,6 +1840,9 @@ class Exporter:
                 "TOTAL_AMOUNT_WITH_VAT": money(item.amount),
                 "LEFT_SIGNER_NAME": _left_signer,
                 "RIGHT_SIGNER_NAME": _right_signer,
+                "ORG_HEAD_NAME": "" if _supplier_is_ip else _supplier_signer,
+                "IP_NAME": item.supplier.name if _supplier_is_ip else "",
+                "IP_OGRNIP": (item.supplier.ogrnip or "") if _supplier_is_ip else "",
                 "SUPPLY_CONTRACT_NUMBER": item.supply_contract.number if item.supply_contract else "",
                 "SUPPLY_CONTRACT_DATE": self._date_text(item.supply_contract.contract_date) if item.supply_contract else "",
             }

@@ -830,10 +830,11 @@ class MaterialForm(BaseStyledForm, forms.ModelForm):
 class SupplierForm(BaseStyledForm, forms.ModelForm):
     class Meta:
         model = Supplier
-        fields = ["name", "tax_id", "contact_person", "phone", "email", "address", "requisites"]
+        fields = ["name", "tax_id", "ogrnip", "contact_person", "phone", "email", "address", "requisites"]
         labels = {
             "name": "Поставщик",
             "tax_id": "ИНН",
+            "ogrnip": "ОГРНИП",
             "contact_person": "Контактное лицо",
             "phone": "Телефон",
             "email": "Эл. почта",

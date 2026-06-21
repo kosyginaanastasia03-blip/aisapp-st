@@ -81,6 +81,10 @@ class DocumentType(TimeStampedModel):
 class Supplier(TimeStampedModel):
     name = models.CharField(max_length=255, unique=True)
     tax_id = models.CharField(max_length=32, blank=True)
+    ogrnip = models.CharField(
+        max_length=32, blank=True,
+        help_text="Заполняется только для поставщиков-ИП.",
+    )
     contact_person = models.CharField(max_length=255, blank=True)
     phone = models.CharField(max_length=64, blank=True)
     email = models.EmailField(blank=True)
