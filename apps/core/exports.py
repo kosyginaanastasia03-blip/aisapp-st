@@ -1821,7 +1821,7 @@ class Exporter:
                 "BUYER_KPP": org_profile.get("kpp") or "",
                 "BUYER_ADDRESS": org_profile.get("address") or "",
                 "CONSIGNEE_NAME": buyer_name,
-                "CONSIGNEE_NAME_ADDRESS": buyer_name,
+                "CONSIGNEE_NAME_ADDRESS": f"{buyer_name}, {organization_profile.get('address', '')}".strip(", "),
                 "CONSIGNEE_REQUISITES": buyer_requisites,
                 "PAYER_NAME": buyer_name,
                 "PAYER_REQUISITES": buyer_requisites,

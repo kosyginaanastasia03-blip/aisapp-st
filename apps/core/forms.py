@@ -846,6 +846,24 @@ class SupplierForm(BaseStyledForm, forms.ModelForm):
             "requisites": forms.Textarea(attrs={"rows": 4}),
         }
 
+    def clean(self):
+        cleaned_data = super().clean()
+        tax_id = (cleaned_data.get("tax_id") or "").strip()
+        ogrnip = (cleaned_data.get("ogrnip") or "").strip()
+
+        if ogrnip and tax_id and len(tax_id) == 10:
+            self.add_error(
+                "ogrnip",
+                "ОГРНИП заполняется только для ИП. У организаций (ИНН из 10 цифр) "
+                "этого реквизита не должно быть — уберите значение или проверьте ИНН.",
+            )
+        if ogrnip and not tax_id:
+            self.add_error(
+                "ogrnip",
+                "Чтобы заполнить ОГРНИП, сначала укажите ИНН поставщика (12 цифр для ИП).",
+            )
+        return cleaned_data
+
 
 class ConstructionObjectForm(BaseStyledForm, forms.ModelForm):
     class Meta:
