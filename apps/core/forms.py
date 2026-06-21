@@ -972,7 +972,9 @@ class UserForm(BaseStyledForm, forms.ModelForm):
         }
         help_texts = {
             "username": "Используйте буквы, цифры и символы @/./+/-/_.",
+            "first_name": "Укажите имя и отчество через пробел, например: Олег Александрович.",
         }
+
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
