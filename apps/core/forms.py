@@ -749,12 +749,48 @@ class ReportFilterForm(DateRangeValidationMixin, BaseStyledForm, forms.Form):
             self.fields.pop("object_name", None)
 
 class AuditLogFilterForm(DateRangeValidationMixin, BaseStyledForm, forms.Form):
-    username = forms.CharField(required=False, label="Пользователь")
-    action = forms.CharField(required=False, label="Действие")
-    entity_type = forms.CharField(required=False, label="Сущность")
+    username = forms.ChoiceField(required=False, choices=[], label="Пользователь")
+    action = forms.ChoiceField(required=False, choices=[], label="Действие")
+    entity_type = forms.ChoiceField(required=False, choices=[], label="Сущность")
     date_from = forms.DateField(required=False, widget=DateInput(), label="С")
     date_to = forms.DateField(required=False, widget=DateInput(), label="По")
     query = forms.CharField(required=False, label="Поиск")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from .models import AuditLog
+
+        usernames = (
+            AuditLog.objects.exclude(user=None)
+            .values_list("user__username", flat=True)
+            .distinct()
+            .order_by("user__username")
+        )
+        self.fields["username"].choices = [("", "Все пользователи")] + [
+            (u, u) for u in usernames if u
+        ]
+
+        actions = (
+            AuditLog.objects.exclude(action="")
+            .values_list("action", flat=True)
+            .distinct()
+            .order_by("action")
+        )
+        from .views import AUDIT_ACTION_LABELS
+        self.fields["action"].choices = [("", "Все действия")] + [
+            (a, AUDIT_ACTION_LABELS.get(a, a)) for a in actions if a
+        ]
+
+        entity_types = (
+            AuditLog.objects.exclude(entity_type="")
+            .values_list("entity_type", flat=True)
+            .distinct()
+            .order_by("entity_type")
+        )
+        from .views import AUDIT_ENTITY_LABELS
+        self.fields["entity_type"].choices = [("", "Все сущности")] + [
+            (e, AUDIT_ENTITY_LABELS.get(e, e)) for e in entity_types if e
+        ]
 
 
 class MaterialForm(BaseStyledForm, forms.ModelForm):
