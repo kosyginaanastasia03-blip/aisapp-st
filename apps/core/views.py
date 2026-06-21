@@ -564,8 +564,6 @@ OPERATION_CONFIG: dict[str, dict[str, Any]] = {
 
 
 def _require_roles(request: HttpRequest, allowed_roles: set[str]) -> None:
-    if request.user.is_superuser:
-        return
     if getattr(request.user, "role", None) not in allowed_roles:
         raise PermissionDenied("Недостаточно прав для выполнения операции.")
 

@@ -133,6 +133,10 @@ def _upload_document_type_choices() -> list[tuple[str, str]]:
 
 
 class ProcurementRequestCreateForm(BaseStyledForm, forms.Form):
+    number = forms.CharField(
+        max_length=128, required=False, label="Номер",
+        help_text="Если оставить пустым, номер будет сформирован автоматически (по участку).",
+    )
     request_date = forms.DateField(widget=DateInput(), initial=timezone.localdate, label="Дата заявки")
     site_request = forms.ModelChoiceField(
         queryset=SiteMaterialRequest.objects.none(),
@@ -176,6 +180,11 @@ class ProcurementRequestCreateForm(BaseStyledForm, forms.Form):
         if items:
             parse_line_items(items)
         return items
+    def clean_number(self):
+        number = (self.cleaned_data.get("number") or "").strip()
+        if number and ProcurementRequest.objects.filter(number__iexact=number).exists():
+            raise forms.ValidationError("Заявка с таким номером уже существует.")
+        return number
 
     def clean(self):
         cleaned_data = super().clean()
@@ -185,6 +194,10 @@ class ProcurementRequestCreateForm(BaseStyledForm, forms.Form):
 
 
 class SiteMaterialRequestCreateForm(BaseStyledForm, forms.Form):
+    number = forms.CharField(
+        max_length=128, required=False, label="Номер",
+        help_text="Если оставить пустым, номер будет сформирован автоматически (по участку).",
+    )
     request_date = forms.DateField(widget=DateInput(), initial=timezone.localdate, label="Дата заявки")
     site_name = forms.CharField(max_length=255, label="Участок")
     contract = forms.ModelChoiceField(
@@ -213,6 +226,11 @@ class SiteMaterialRequestCreateForm(BaseStyledForm, forms.Form):
         items = self.cleaned_data["items"]
         parse_line_items(items)
         return items
+    def clean_number(self):
+        number = (self.cleaned_data.get("number") or "").strip()
+        if number and SiteMaterialRequest.objects.filter(number__iexact=number).exists():
+            raise forms.ValidationError("Заявка с таким номером уже существует.")
+        return number
 
 
 class SupplierDocumentUploadForm(BaseStyledForm, forms.Form):

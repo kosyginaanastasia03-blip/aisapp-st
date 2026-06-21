@@ -1495,7 +1495,7 @@ def create_site_material_request(*, user, cleaned_data: dict[str, Any], ip_addre
         ),
     }
     request = SiteMaterialRequest.objects.create(
-        number=generate_scoped_number(
+        number=(cleaned_data.get("number") or "").strip() or generate_scoped_number(
             "SMR-REQ", SiteMaterialRequest, "request_date", cleaned_data["request_date"],
             site_name__iexact=cleaned_data["site_name"],
         ),
@@ -1536,7 +1536,7 @@ def create_procurement_request(*, user, cleaned_data: dict[str, Any], ip_address
     line_items = _line_items_from_text_or_site_request(cleaned_data)
     procurement_site_name = cleaned_data["site_name"] or getattr(user, "site_name", "") or "Участок"
     request = ProcurementRequest.objects.create(
-        number=generate_scoped_number(
+        number=(cleaned_data.get("number") or "").strip() or generate_scoped_number(
             "REQ", ProcurementRequest, "request_date", cleaned_data["request_date"],
             site_name__iexact=procurement_site_name,
         ),
