@@ -943,8 +943,13 @@ def _catalog_queryset_for_request(request: HttpRequest, config: dict[str, Any]):
     return queryset
 
 
+# Справочники, скрытые от администратора в боковом меню
+_ADMIN_HIDDEN_CATALOG_SLUGS = {"contracts", "supply-contracts"}
+
+
 def _navigation(request: HttpRequest) -> dict[str, Any]:
     role = getattr(getattr(request, "user", None), "role", None)
+    is_admin = role == RoleChoices.ADMIN
     catalog_links = []
     operation_links = []
     notifications = {"notification_count": 0, "notification_items": []}
@@ -953,13 +958,16 @@ def _navigation(request: HttpRequest) -> dict[str, Any]:
             {"slug": slug, "title": config["title"], "url": reverse("catalog-page", kwargs={"slug": slug})}
             for slug, config in CATALOG_CONFIG.items()
             if role in config["allowed_roles"]
+            and not (is_admin and slug in _ADMIN_HIDDEN_CATALOG_SLUGS)
         ]
-        operation_links = [
-            {"slug": slug, "title": config["title"], "url": reverse("operation-page", kwargs={"slug": slug})}
-            for slug, config in OPERATION_CONFIG.items()
-            if role in config["allowed_roles"]
-        ]
-    if getattr(getattr(request, "user", None), "is_authenticated", False):
+        # Операции полностью скрыты для администратора
+        if not is_admin:
+            operation_links = [
+                {"slug": slug, "title": config["title"], "url": reverse("operation-page", kwargs={"slug": slug})}
+                for slug, config in OPERATION_CONFIG.items()
+                if role in config["allowed_roles"]
+            ]
+    if getattr(getattr(request, "user", None), "is_authenticated", False) and not is_admin:
         notifications = notification_summary(request.user)
     return {
         "catalog_links": catalog_links,
@@ -971,8 +979,8 @@ def _navigation(request: HttpRequest) -> dict[str, Any]:
         "backups_url": reverse("backups"),
         "audit_log_url": reverse("audit-log"),
         "dashboard_url": reverse("dashboard"),
-        "analytics_url": reverse("analytics"),
-        "organization_profile_url": reverse("organization-profile") if role == RoleChoices.ADMIN else "",
+        "analytics_url": reverse("analytics") if not is_admin else "",
+        "organization_profile_url": reverse("organization-profile") if is_admin else "",
         "can_access_documents": can_access_documents(role),
         "can_access_archive": can_access_archive(role),
         "can_access_reports": can_access_reports(role),
@@ -1083,10 +1091,20 @@ def _draft_payload_from_form(form) -> dict[str, Any]:
 
 
 def _can_create_in_config(*, request: HttpRequest, config: dict[str, Any]) -> bool:
-    if request.user.is_superuser:
-        return True
+    role = getattr(request.user, "role", None)
+    # Администратор не создаёт/редактирует операционные документы и договоры,
+    # но может управлять справочниками (пользователи, типы документов и др.)
+    if role == RoleChoices.ADMIN and config.get("entity_type") in {
+        "smr_contract", "supply_contract",
+        "site_material_request", "procurement_request",
+        "supplier_document", "primary_document",
+        "stock_receipt", "stock_issue",
+        "write_off", "ppe_issuance",
+        "work_acceptance", "work_schedule",
+    }:
+        return False
     read_only_roles = set(config.get("read_only_roles", set()))
-    return getattr(request.user, "role", None) not in read_only_roles
+    return role not in read_only_roles
 
 
 def _scope_operation_form_for_supplier(*, request: HttpRequest, config: dict[str, Any], form) -> None:
@@ -1137,6 +1155,10 @@ def _operation_form_kwargs(*, request: HttpRequest, config: dict[str, Any], init
 
 @login_required
 def dashboard(request: HttpRequest) -> HttpResponse:
+    # Для технического администратора панель пустая
+    if getattr(request.user, "role", None) == RoleChoices.ADMIN:
+        return _render(request, "core/dashboard.html", {"title": "Панель управления"})
+
     recent_documents = filter_queryset_for_user(request.user, DocumentRecord.objects.select_related("created_by").order_by("-doc_date", "-id"))
     if request.user.role == RoleChoices.SUPPLIER:
         metrics = {
@@ -1557,6 +1579,9 @@ def _notification_payload(item: Any, *, documents_url: str) -> dict[str, Any]:
 def notifications_feed(request: HttpRequest) -> JsonResponse:
     if request.method != "GET":
         raise Http404("Метод не поддерживается.")
+    # Администратор не получает уведомления
+    if getattr(request.user, "role", None) == RoleChoices.ADMIN:
+        return JsonResponse({"count": 0, "items": []})
     role = getattr(request.user, "role", None)
     documents_url = reverse("documents") if can_access_documents(role) else ""
     summary = notification_summary(request.user)
@@ -1732,8 +1757,6 @@ def documents(request: HttpRequest) -> HttpResponse:
             schedule = WorkSchedule.objects.filter(contract_id=record.entity_id).first()
             if schedule and schedule.attachment:
                 record.schedule_scan_url = schedule.attachment.url
-        #if record.entity_type == "smr_contract":
-            #print(f"DEBUG: договор {record.doc_number}, entity_id={record.entity_id}, estimate={record.estimate_url}, scan={record.scan_url}")
 
         if can_manage_status:
             allowed_statuses = workflow_allowed_statuses(request.user, record)
@@ -1815,14 +1838,6 @@ def _archive_filters(cleaned_data):
         **cleaned_data,
         "counterparty": counterparty.name if counterparty else "",
         "object_name": object_obj.name if object_obj else "",
-    }
-
-    return {
-        **cleaned_data,
-        "material_code": material.code if material else "",
-        "object_name": object_obj.name if object_obj else "",
-        "supplier_name": supplier.name if supplier else "",
-        "contract_number": contract.number if contract else "",
     }
 
 @login_required
@@ -2103,9 +2118,7 @@ def contract_materials_json(request: HttpRequest) -> JsonResponse:
         norms = MaterialNorm.objects.select_related("material").filter(work_type=work_line.work_type)
         for norm in norms:
             material = norm.material
-            # Количество по договору (норма × объём)
             qty_by_contract = Decimal(work_line.quantity) * Decimal(norm.norm_per_unit)
-            # Запас из справочника материала (в единицах измерения)
             reserve = Decimal(material.stock_reserve_qty or 0)
             
             if material.id in materials_needed:
@@ -2127,7 +2140,6 @@ def contract_materials_json(request: HttpRequest) -> JsonResponse:
             "material_name": m["material_name"],
             "unit": m["unit"],
             "unit_price": m["unit_price"],
-            # Итого = по договору + запас
             "quantity": str(math.ceil(float(m["qty_by_contract"] + m["reserve"]))),
             "qty_by_contract": str(math.ceil(float(m["qty_by_contract"]))),
             "reserve": str(math.ceil(float(m["reserve"]))),
@@ -2154,7 +2166,6 @@ def supplier_document_materials_json(request: HttpRequest) -> JsonResponse:
     if not doc or not doc.request:
         return JsonResponse({"materials": []})
 
-    # Индекс цен из счёта по той же заявке
     price_index: dict[str, str] = {}
     invoice = SupplierDocument.objects.filter(
         request=doc.request,
@@ -2166,14 +2177,12 @@ def supplier_document_materials_json(request: HttpRequest) -> JsonResponse:
             if sdl.unit_price:
                 price_index[sdl.material.code] = str(sdl.unit_price)
 
-    # Индекс примечаний из строк заявки
     notes_index: dict[str, str] = {}
     if doc.request:
         for req_line in doc.request.lines.select_related("material").all():
             if req_line.notes:
                 notes_index[req_line.material.code] = req_line.notes
 
-    # Берём строки из накладной если есть, иначе из заявки
     supplier_lines = list(SupplierDocumentLine.objects.select_related("material").filter(document=doc))
     if supplier_lines:
         data = [
@@ -2348,7 +2357,6 @@ def schedule_stage_dates_json(request: HttpRequest) -> JsonResponse:
         schedule__contract_id=contract_id,
         work_type__iexact=work_type,
         stage__iexact=stage,
-        #schedule__status=DocumentStatus.ACCEPTED,
     ).first()
     
     if not line:
@@ -2358,6 +2366,7 @@ def schedule_stage_dates_json(request: HttpRequest) -> JsonResponse:
         "start_date": line.start_date.strftime("%Y-%m-%d") if line.start_date else "",
         "end_date": line.end_date.strftime("%Y-%m-%d") if line.end_date else "",
     })
+
 @login_required
 def procurement_request_materials_json(request: HttpRequest) -> JsonResponse:
     request_id = request.GET.get("request_id")
@@ -2397,7 +2406,6 @@ def site_request_materials_json(request: HttpRequest) -> JsonResponse:
     from .models import SupplierDocumentLine
     from .services import INVOICE_DOC_TYPES
 
-    # Ищем счёт по заявке на закупку, которая связана с этой заявкой участка
     price_index: dict[str, str] = {}
     procurement_req = ProcurementRequest.objects.filter(
         site_request=req
@@ -2434,7 +2442,6 @@ def site_requests_by_site_json(request: HttpRequest) -> JsonResponse:
     if not site_name:
         return JsonResponse({"requests": []})
 
-    # Заявки участка которые уже использованы в отпусках на утверждении или выше
     busy_request_ids = StockIssue.objects.filter(
         status__in=[
             DocumentStatus.APPROVAL,
@@ -2452,6 +2459,7 @@ def site_requests_by_site_json(request: HttpRequest) -> JsonResponse:
     return JsonResponse({
         "requests": [{"id": r.pk, "label": str(r)} for r in qs]
     })
+
 @login_required
 def invoice_prices_by_request_json(request: HttpRequest) -> JsonResponse:
     request_id = request.GET.get("request_id")
@@ -2482,6 +2490,7 @@ def invoice_prices_by_request_json(request: HttpRequest) -> JsonResponse:
         "prices": prices,
         "vat_rate": str(invoice.vat_rate) if invoice.vat_rate else "",
     })
+
 @login_required
 def site_manager_by_site_json(request: HttpRequest) -> JsonResponse:
     site_name = request.GET.get("site_name", "").strip()
@@ -2498,6 +2507,7 @@ def site_manager_by_site_json(request: HttpRequest) -> JsonResponse:
         "user_id": manager.pk,
         "user_name": manager.full_name_or_username,
     })
+
 @login_required
 def invoice_prices_by_site_request_json(request: HttpRequest) -> JsonResponse:
     request_id = request.GET.get("request_id")
@@ -2539,6 +2549,7 @@ def invoice_prices_by_site_request_json(request: HttpRequest) -> JsonResponse:
             prices[line.material.code] = str(line.unit_price)
 
     return JsonResponse({"prices": prices})
+
 @login_required
 def contract_details_json(request: HttpRequest) -> JsonResponse:
     contract_id = request.GET.get("contract_id")
