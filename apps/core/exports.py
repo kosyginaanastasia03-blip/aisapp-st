@@ -1084,8 +1084,8 @@ class Exporter:
             "STOCK_CARD_NUMBER": "",
             "SENDER_POSITION": "Поставщик",
             "RECEIVER_POSITION": "Кладовщик",
-            "LEFT_SIGNER_NAME": self._short_name(receipt.supplier.contact_person) if receipt.supplier.contact_person else receipt.supplier.name,
-            "RIGHT_SIGNER_NAME": self._short_name(receipt.created_by.full_name_or_username) if receipt.created_by_id else "",
+            "LEFT_SIGNER_NAME": self._last_name_initials(receipt.supplier.contact_person) if receipt.supplier.contact_person else receipt.supplier.name,
+            "RIGHT_SIGNER_NAME": self._last_name_initials(receipt.created_by.full_name_or_username) if receipt.created_by_id else "",
         }
         def map_line(line, index: int) -> dict[str, Any]:
             return {
