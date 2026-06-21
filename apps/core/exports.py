@@ -1845,6 +1845,10 @@ class Exporter:
                 "IP_OGRNIP": (item.supplier.ogrnip or "") if _supplier_is_ip else "",
                 "SUPPLY_CONTRACT_NUMBER": item.supply_contract.number if item.supply_contract else "",
                 "SUPPLY_CONTRACT_DATE": self._date_text(item.supply_contract.contract_date) if item.supply_contract else "",
+                "PAYER_ACCOUNT": self._organization_profile().get("account", ""),
+                "PAYER_BANK_NAME": self._organization_profile().get("bank_name", ""),
+                "PAYER_BANK_BIK": self._organization_profile().get("bik", ""),
+                "PAYER_BANK_CORR_ACCOUNT": self._organization_profile().get("corr_account", ""),
             }
             if lines_data:
                 if self._render_docx_template_with_table_rows(
