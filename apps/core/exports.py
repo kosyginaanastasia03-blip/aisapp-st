@@ -1305,9 +1305,9 @@ class Exporter:
         from .models import User, RoleChoices
         request = SiteMaterialRequest.objects.select_related("contract", "requested_by").prefetch_related("lines__material").get(pk=entity_id)
         requester_name = request.requested_by.full_name_or_username if request.requested_by_id else ""
-        requester_short = self._short_name(requester_name) if requester_name else "________________"
+        requester_short = self._last_name_initials(requester_name) if requester_name else "________________"
+        warehouse_short = self._last_name_initials(warehouse_user.full_name_or_username) if warehouse_user else "________________"       
         warehouse_user = User.objects.filter(role=RoleChoices.WAREHOUSE, is_active=True).first()
-        warehouse_short = self._short_name(warehouse_user.full_name_or_username) if warehouse_user else "________________"
         doc = self._prepare_doc("ЗАЯВКА НА МАТЕРИАЛЫ СО СКЛАДА", f"№ {request.number} от {request.request_date}")
         self._add_meta(doc, [
             ("Участок", request.site_name),
@@ -1367,12 +1367,12 @@ class Exporter:
             ],
         )
         supplier_name = (
-            self._short_name(request.supplier.contact_person)
+            self._last_name_initials(request.supplier.contact_person)
             if request.supplier and request.supplier.contact_person
             else (request.supplier.name if request.supplier else "________________")
         )
         requester_name = (
-            self._short_name(request.requested_by.full_name_or_username)
+            self._last_name_initials(request.requested_by.full_name_or_username)
             if request.requested_by_id
             else "________________"
         )
@@ -1778,7 +1778,7 @@ class Exporter:
         if template_name:
             from .models import User, RoleChoices
             _warehouse_user = User.objects.filter(role=RoleChoices.WAREHOUSE, is_active=True).first()
-            _warehouse_short = self._short_name(_warehouse_user.full_name_or_username) if _warehouse_user else ""
+            _warehouse_short = self._last_name_initials(_warehouse_user.full_name_or_username) if _warehouse_user else ""
 
             supplier_requisites = self._supplier_requisites(item.supplier) or "-"
             buyer_name = self._organization_name() or "-"
@@ -1786,7 +1786,7 @@ class Exporter:
             uploaded_by_name = item.uploaded_by.full_name_or_username if item.uploaded_by_id else ""
             org_profile = self._organization_profile()
 
-            _supplier_signer = self._short_name(item.supplier.contact_person) if item.supplier.contact_person else item.supplier.name
+            _supplier_signer = self._last_name_initials(item.supplier.contact_person) if item.supplier.contact_person else item.supplier.name
             _supplier_is_ip = len((item.supplier.tax_id or "").strip()) == 12
             if "наклад" in normalized_doc_type or "упд" in normalized_doc_type:
                 _left_signer = _supplier_signer
