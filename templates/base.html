@@ -68,11 +68,11 @@
                             <span>Отчеты</span>
                         </a>
                     {% endif %}
-                        {% if request.user.role != "supplier" %}
-                        <a class="menu-link{% if request.path == analytics_url %} is-active{% endif %}" href="{{ analytics_url }}">
-                            <svg class="bi nav-icon" aria-hidden="true"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#bar-chart-line"></use></svg>
-                            <span>Аналитика</span>
-                        </a>
+                        {% if request.user.role != "supplier" and analytics_url %}
+                            <a class="menu-link{% if request.path == analytics_url %} is-active{% endif %}" href="{{ analytics_url }}">
+                                <svg class="bi nav-icon" aria-hidden="true"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#bar-chart-line"></use></svg>
+                                <span>Аналитика</span>
+                            </a>
                         {% endif %}
                     {% if can_access_backups %}
                         <a class="menu-link{% if request.path == backups_url %} is-active{% endif %}" href="{{ backups_url }}">
