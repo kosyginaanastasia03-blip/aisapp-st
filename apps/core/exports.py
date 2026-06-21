@@ -970,7 +970,7 @@ class Exporter:
             "BUYER_KPP": organization_profile.get("kpp", ""),
             "BUYER_INN_KPP": organization_profile.get("tax_id", ""),
             "CONSIGNEE_NAME": buyer_name,
-            "CONSIGNEE_NAME_ADDRESS": f"{buyer_name}, {organization_profile.get('address', '')}".strip(", "),
+            "CONSIGNEE_NAME_ADDRESS": f"{buyer_name}, {self._organization_profile().get('address', '')}".strip(", "),
             "CONSIGNEE_REQUISITES": buyer_requisites,
             "PAYER_NAME": buyer_name,
             "PAYER_INN": organization_profile.get("tax_id", ""),
