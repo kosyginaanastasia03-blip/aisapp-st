@@ -88,7 +88,16 @@ def generate_number(prefix: str) -> str:
     pattern = f"{prefix}-{date_part}-"
     count = DocumentRecord.objects.filter(doc_number__startswith=pattern).count()
     return f"{prefix}-{date_part}-{count + 1:03d}"
- 
+
+def generate_scoped_number(prefix: str, model, date_field: str, date_value, **scope_filters) -> str:
+    """
+    Как generate_number, но счётчик считается не глобально, а в рамках
+    заданного фильтра (например, по конкретному участку)  так у каждого
+    участка своя последовательность номеров за день, а не общая на всех.
+    """
+    date_part = date_value.strftime("%Y%m%d")
+    count = model.objects.filter(**{date_field: date_value}, **scope_filters).count()
+    return f"{prefix}-{date_part}-{count + 1:03d}"
  
 STATUS_LABELS = dict(DocumentStatus.choices)
 ROLE_LABELS = dict(RoleChoices.choices)
@@ -1486,7 +1495,10 @@ def create_site_material_request(*, user, cleaned_data: dict[str, Any], ip_addre
         ),
     }
     request = SiteMaterialRequest.objects.create(
-        number=generate_number("SMR-REQ"),
+        number=generate_scoped_number(
+            "SMR-REQ", SiteMaterialRequest, "request_date", cleaned_data["request_date"],
+            site_name__iexact=cleaned_data["site_name"],
+        ),
         request_date=cleaned_data["request_date"],
         site_name=cleaned_data["site_name"],
         contract=cleaned_data.get("contract"),
@@ -1522,10 +1534,14 @@ def create_procurement_request(*, user, cleaned_data: dict[str, Any], ip_address
         ),
     }
     line_items = _line_items_from_text_or_site_request(cleaned_data)
+    procurement_site_name = cleaned_data["site_name"] or getattr(user, "site_name", "") or "Участок"
     request = ProcurementRequest.objects.create(
-        number=generate_number("REQ"),
+        number=generate_scoped_number(
+            "REQ", ProcurementRequest, "request_date", cleaned_data["request_date"],
+            site_name__iexact=procurement_site_name,
+        ),
         request_date=cleaned_data["request_date"],
-        site_name=cleaned_data["site_name"] or getattr(user, "site_name", "") or "Участок",
+        site_name=procurement_site_name,
         contract=cleaned_data.get("contract") or (site_request.contract if site_request else None),
         site_request=site_request,
         supplier=cleaned_data.get("supplier"),
@@ -1685,7 +1701,7 @@ def create_primary_document(*, user, cleaned_data: dict[str, Any], ip_address: s
     calculated_amount = sum((item["quantity"] * item["unit_price"] for item in line_items), Decimal("0"))
     document = PrimaryDocument.objects.create(
         document_type=document_type,
-        number=generate_number(document_type.prefix),
+        number=(cleaned_data.get("number") or "").strip() or generate_number(document_type.prefix),
         doc_date=cleaned_data["doc_date"],
         supplier=_primary_document_supplier(cleaned_data=cleaned_data, user=user),
         procurement_request=cleaned_data.get("request"),
@@ -1740,7 +1756,7 @@ def create_stock_receipt(*, user, cleaned_data: dict[str, Any], ip_address: str 
     # ------------------------------------------------------------------
  
     receipt = StockReceipt.objects.create(
-        number=generate_number("REC"),
+        number=(cleaned_data.get("number") or "").strip() or generate_number("REC"),
         receipt_date=cleaned_data["receipt_date"],
         supplier=supplier,
         supplier_document=supplier_document,
@@ -1823,7 +1839,7 @@ def create_stock_issue(*, user, cleaned_data: dict[str, Any], ip_address: str | 
         raise ValueError("Укажите участок или выберите заявку участка.")
  
     issue = StockIssue.objects.create(
-        number=generate_number("ISS"),
+        number=(cleaned_data.get("number") or "").strip() or generate_number("ISS"),
         issue_date=cleaned_data["issue_date"],
         site_name=issue_site_name,
         contract=cleaned_data.get("contract") or (site_request.contract if site_request else None),
@@ -1980,7 +1996,7 @@ def create_writeoff(*, user, cleaned_data: dict[str, Any], ip_address: str | Non
             )
  
     act = WriteOffAct.objects.create(
-        number=generate_number("WO"),
+        number=(cleaned_data.get("number") or "").strip() or generate_number("WO"),
         act_date=cleaned_data["act_date"],
         contract=contract,
         template_variant=template_variant,
@@ -2039,7 +2055,7 @@ def create_ppe_issuance(*, user, cleaned_data: dict[str, Any], ip_address: str |
     prepared_lines = _prepare_ppe_issuance_lines(user=user, site_name=cleaned_data["site_name"], raw_items=cleaned_data["items"])
  
     issuance = PPEIssuance.objects.create(
-        number=generate_number("PPE"),
+        number=(cleaned_data.get("number") or "").strip() or generate_number("PPE"),
         issue_date=cleaned_data["issue_date"],
         site_name=cleaned_data["site_name"],
         season=cleaned_data.get("season", ""),
@@ -2072,7 +2088,7 @@ def create_work_acceptance(*, user, cleaned_data: dict[str, Any], ip_address: st
         fallback=contract.object.name if contract.object else getattr(user, "site_name", "") or "Участок",
     )
     act = WorkAcceptanceAct.objects.create(
-        number=generate_number("ACC"),
+        number=(cleaned_data.get("number") or "").strip() or generate_number("ACC"),
         act_date=cleaned_data["act_date"],
         contract=contract,
         site_name=site_name,
@@ -3103,7 +3119,7 @@ def work_volume_forecast(*, date_from=None, date_to=None) -> list[dict[str, Any]
 @transaction.atomic
 def create_work_schedule(*, user, cleaned_data: dict[str, Any], ip_address: str | None = None):
     schedule = WorkSchedule.objects.create(
-        number=generate_number("SCH"),
+        number=(cleaned_data.get("number") or "").strip() or generate_number("SCH"),
         contract=cleaned_data["contract"],
         site_name=_scoped_site_name(user=user, site_name=cleaned_data.get("site_name")),
         period_start=cleaned_data["period_start"],

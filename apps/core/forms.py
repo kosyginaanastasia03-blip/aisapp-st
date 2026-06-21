@@ -263,6 +263,10 @@ class SupplierDocumentUploadForm(BaseStyledForm, forms.Form):
 
 class PrimaryDocumentCreateForm(BaseStyledForm, forms.Form):
     document_type = forms.ModelChoiceField(queryset=DocumentType.objects.none(), label="Тип документа")
+    number = forms.CharField(
+        max_length=128, required=False, label="Номер",
+        help_text="Если оставить пустым, номер будет сформирован автоматически.",
+    )
     doc_date = forms.DateField(widget=DateInput(), initial=timezone.localdate, label="Дата")
     supplier = forms.ModelChoiceField(queryset=Supplier.objects.order_by("name"), required=False, label="Поставщик")
     request = forms.ModelChoiceField(queryset=ProcurementRequest.objects.order_by("-request_date"), required=False, label="Заявка")
@@ -287,9 +291,17 @@ class PrimaryDocumentCreateForm(BaseStyledForm, forms.Form):
         if items:
             parse_line_items(items)
         return items
-
+    def clean_number(self):
+        number = (self.cleaned_data.get("number") or "").strip()
+        if number and PrimaryDocument.objects.filter(number__iexact=number).exists():
+            raise forms.ValidationError("Документ с таким номером уже существует.")
+        return number
 
 class StockReceiptCreateForm(BaseStyledForm, forms.Form):
+    number = forms.CharField(
+        max_length=128, required=False, label="Номер",
+        help_text="Если оставить пустым, номер будет сформирован автоматически.",
+    )
     receipt_date = forms.DateField(widget=DateInput(), initial=timezone.localdate, label="Дата прихода")
     supplier = forms.ModelChoiceField(queryset=Supplier.objects.order_by("name"), required=False, label="Поставщик")
     supplier_document = forms.ModelChoiceField(queryset=SupplierDocument.objects.none(), required=False, label="Документ поставщика")
@@ -334,9 +346,19 @@ class StockReceiptCreateForm(BaseStyledForm, forms.Form):
         if not cleaned_data.get("items") and not supplier_document:
             raise forms.ValidationError("Заполните позиции или выберите документ поставщика.")
         return cleaned_data
+    
+    def clean_number(self):
+        number = (self.cleaned_data.get("number") or "").strip()
+        if number and StockReceipt.objects.filter(number__iexact=number).exists():
+            raise forms.ValidationError("Приходный ордер с таким номером уже существует.")
+        return number
 
 
 class StockIssueCreateForm(BaseStyledForm, forms.Form):
+    number = forms.CharField(
+        max_length=128, required=False, label="Номер",
+        help_text="Если оставить пустым, номер будет сформирован автоматически.",
+    )
     issue_date = forms.DateField(widget=DateInput(), initial=timezone.localdate, label="Дата отпуска")
     site_name = forms.ChoiceField(choices=[], required=True, label="Участок")
     site_request = forms.IntegerField(
@@ -406,7 +428,16 @@ class StockIssueCreateForm(BaseStyledForm, forms.Form):
             return SiteMaterialRequest.objects.get(pk=request_id)
         except SiteMaterialRequest.DoesNotExist:
             return None
+    def clean_number(self):
+        number = (self.cleaned_data.get("number") or "").strip()
+        if number and StockIssue.objects.filter(number__iexact=number).exists():
+            raise forms.ValidationError("Требование-накладная с таким номером уже существует.")
+        return number
 class WriteOffCreateForm(BaseStyledForm, forms.Form):
+    number = forms.CharField(
+        max_length=128, required=False, label="Номер",
+        help_text="Если оставить пустым, номер будет сформирован автоматически.",
+    )
     act_date = forms.DateField(widget=DateInput(), initial=timezone.localdate, label="Дата акта")
     contract = forms.ModelChoiceField(queryset=SMRContract.objects.order_by("-contract_date"), label="Договор СМР", required=False, empty_label="Не выбрано (для хознужд)")
     template_variant = forms.ChoiceField(
@@ -478,9 +509,17 @@ class WriteOffCreateForm(BaseStyledForm, forms.Form):
         values.extend(MaterialNorm.objects.exclude(work_type="").order_by("work_type").values_list("work_type", flat=True))
         values.extend(SMRContract.objects.exclude(work_type="").order_by("work_type").values_list("work_type", flat=True))
         return _text_choices(values, empty_label="По договору СМР")
-
+    def clean_number(self):
+        number = (self.cleaned_data.get("number") or "").strip()
+        if number and WriteOffAct.objects.filter(number__iexact=number).exists():
+            raise forms.ValidationError("Акт списания с таким номером уже существует.")
+        return number
 
 class PPEIssuanceCreateForm(BaseStyledForm, forms.Form):
+    number = forms.CharField(
+        max_length=128, required=False, label="Номер",
+        help_text="Если оставить пустым, номер будет сформирован автоматически.",
+    )
     issue_date = forms.DateField(widget=DateInput(), initial=timezone.localdate, label="Дата выдачи")
     site_name = forms.CharField(max_length=255, label="Участок")
     season = forms.ChoiceField(choices=[("летняя", "летняя"), ("зимняя", "зимняя"), ("перчатки", "перчатки")], required=False, label="Сезон")
@@ -494,6 +533,11 @@ class PPEIssuanceCreateForm(BaseStyledForm, forms.Form):
         items = self.cleaned_data["items"]
         parse_ppe_lines(items)
         return items
+    def clean_number(self):
+        number = (self.cleaned_data.get("number") or "").strip()
+        if number and PPEIssuance.objects.filter(number__iexact=number).exists():
+            raise forms.ValidationError("Ведомость с таким номером уже существует.")
+        return number
 
 
 class WorkLogCreateForm(BaseStyledForm, forms.Form):
@@ -537,6 +581,10 @@ class WorkLogCreateForm(BaseStyledForm, forms.Form):
         self.fields["work_type"].choices = choices
 
 class WorkAcceptanceCreateForm(BaseStyledForm, forms.Form):
+    number = forms.CharField(
+        max_length=128, required=False, label="Номер",
+        help_text="Если оставить пустым, номер будет сформирован автоматически.",
+    )
     act_date = forms.DateField(widget=DateInput(), initial=timezone.localdate, label="Дата акта")
     contract = forms.ModelChoiceField(
         queryset=SMRContract.objects.exclude(
@@ -550,7 +598,11 @@ class WorkAcceptanceCreateForm(BaseStyledForm, forms.Form):
     site_name = forms.CharField(max_length=255, label="Участок")
     work_description = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 3}), label="Описание выполненных работ")
     amount = forms.DecimalField(max_digits=14, decimal_places=2, required=False, label="Сумма по акту")
-
+    def clean_number(self):
+        number = (self.cleaned_data.get("number") or "").strip()
+        if number and WorkAcceptanceAct.objects.filter(number__iexact=number).exists():
+            raise forms.ValidationError("Акт с таким номером уже существует.")
+        return number
 
 class ArchiveFilterForm(DateRangeValidationMixin, BaseStyledForm, forms.Form):
     doc_type = forms.ChoiceField(required=False, choices=[], label="Тип документа")
@@ -963,7 +1015,7 @@ class UserForm(BaseStyledForm, forms.ModelForm):
         fields = ["username", "first_name", "last_name", "email", "role", "site_name", "supplier", "is_active"]
         labels = {
             "username": "Логин",
-            "first_name": "Имя",
+            "first_name": "Имя и Отчество",
             "last_name": "Фамилия",
             "email": "Адрес электронной почты",
             "site_name": "Участок / подразделение",
@@ -971,8 +1023,8 @@ class UserForm(BaseStyledForm, forms.ModelForm):
             "is_active": "Активный",
         }
         help_texts = {
-            "username": "Используйте буквы, цифры и символы @/./+/-/_.",
-            "first_name": "Укажите имя и отчество через пробел, например: Олег Александрович.",
+            "username": "Используйте буквы, цифры и символы @/./+/-/_",
+            "first_name": "Укажите имя и отчество через пробел, например: Олег Александрович",
         }
 
 
@@ -1063,6 +1115,10 @@ class BackupRestoreUploadForm(BaseStyledForm, forms.Form):
 
 
 class WorkScheduleCreateForm(BaseStyledForm, forms.Form):
+    number = forms.CharField(
+        max_length=128, required=False, label="Номер",
+        help_text="Если оставить пустым, номер будет сформирован автоматически.",
+    )
     contract = forms.ModelChoiceField(
         queryset=SMRContract.objects.order_by("-contract_date"),
         label="Договор СМР"
@@ -1087,6 +1143,11 @@ class WorkScheduleCreateForm(BaseStyledForm, forms.Form):
         except (ValueError, TypeError):
             raise forms.ValidationError("Ошибка формата строк.")
         return items    
+    def clean_number(self):
+        number = (self.cleaned_data.get("number") or "").strip()
+        if number and WorkSchedule.objects.filter(number__iexact=number).exists():
+            raise forms.ValidationError("График с таким номером уже существует.")
+        return number
 class WorkStageForm(BaseStyledForm, forms.Form):
     work_type = forms.ChoiceField(choices=[], label="Вид работ")
     stages = forms.CharField(
