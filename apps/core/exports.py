@@ -1310,8 +1310,8 @@ class Exporter:
         request = SiteMaterialRequest.objects.select_related("contract", "requested_by").prefetch_related("lines__material").get(pk=entity_id)
         requester_name = request.requested_by.full_name_or_username if request.requested_by_id else ""
         requester_short = self._last_name_initials(requester_name) if requester_name else "________________"
-        warehouse_short = self._last_name_initials(warehouse_user.full_name_or_username) if warehouse_user else "________________"       
         warehouse_user = User.objects.filter(role=RoleChoices.WAREHOUSE, is_active=True).first()
+        warehouse_short = self._last_name_initials(warehouse_user.full_name_or_username) if warehouse_user else "________________"
         doc = self._prepare_doc("ЗАЯВКА НА МАТЕРИАЛЫ СО СКЛАДА", f"№ {request.number} от {request.request_date}")
         self._add_meta(doc, [
             ("Участок", request.site_name),
