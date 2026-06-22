@@ -1217,6 +1217,10 @@ class Exporter:
             "CONTRACTOR_SIGNER_NAME_FULL": contractor_signer,
             "CONTRACTOR_SIGNER_POSITION": profile.get("contractor_signer_position") or "представителя",
             "CONTRACTOR_AUTH_DOC": profile.get("contractor_auth_doc") or "доверенности",
+            "CUSTOMER_SIGNER_POSITION_GENITIVE": act.contract.customer_signer_position_genitive or act.contract.customer_signer_position or "представителя",
+            "CUSTOMER_SIGNER_NAME_GENITIVE": act.contract.customer_signer_name_genitive or customer_signer or "________________",
+            "CONTRACTOR_SIGNER_POSITION_GENITIVE": profile.get("contractor_signer_position_genitive") or profile.get("contractor_signer_position") or "представителя",
+            "CONTRACTOR_SIGNER_NAME_GENITIVE": profile.get("contractor_signer_name_genitive") or contractor_signer or "________________",
         }
 
     def _supplier_document_template_name(self, doc_type: str) -> str | None:
