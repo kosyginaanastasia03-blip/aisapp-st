@@ -1798,7 +1798,11 @@ class Exporter:
             context = {
                 **self._template_common_context(),
                 "INVOICE_NUMBER": item.doc_number,
-                "RECEIVER_BANK": self._extract_requisite(supplier_requisites, r"(?:банк|в\s+банке?)\s*[:—]?\s*([^;,\n]+)") or supplier_requisites,
+                "RECEIVER_BANK": (
+                    self._extract_requisite(supplier_requisites, r"р/с\s+\S+\s+в\s+([^;,\n]+)")
+                    or self._extract_requisite(supplier_requisites, r"(?:банк|в\s+банке?)\s*[:—]?\s*([^;,\n]+)")
+                    or ""
+                ),
                 "BANK_BIK": self._extract_requisite(supplier_requisites, r"БИК\s*[:№#-]?\s*([0-9]{9})"),
                 "BANK_ACCOUNT": self._extract_requisite(supplier_requisites, r"(?:р/с|расчетный\s+счет|расч[её]тный\s+счет)\s*[:№#-]?\s*([0-9]{20})"),
                 "BANK_CORR_ACCOUNT": self._extract_requisite(supplier_requisites, r"(?:к/с|корр\.?\s*счет|корреспондентский\s+счет)\s*[:№#-]?\s*([0-9]{20})"),
