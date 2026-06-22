@@ -142,19 +142,19 @@ class Exporter:
         style.font.size = Pt(10)
 
         header_table = doc.add_table(rows=1, cols=2)
-        header_table.style = "Table Grid"
         left = header_table.cell(0, 0)
         right = header_table.cell(0, 1)
+        self._hide_table_borders(header_table)
 
         left.text = ""
         left_para = left.paragraphs[0]
         left_para.add_run("СОГЛАСОВАНО\n").bold = True
-        left_para.add_run(f"Заместитель генерального директора\n{org_name}\n\n_____________________\n{creator_short}\n{year} г.")
+        left_para.add_run(f"Заместитель генерального директора\n{org_name}\n\n_____________________ {creator_short}")
 
         right.text = ""
         right_para = right.paragraphs[0]
         right_para.add_run("УТВЕРЖДАЮ\n").bold = True
-        right_para.add_run(f"Директор программы\n{customer_name}\n\n_____________________\n{customer_signer_short}\n{year} г.")
+        right_para.add_run(f"Директор программы\n{customer_name}\n\n_____________________ {customer_signer_short}")
 
         doc.add_paragraph()
 
@@ -194,18 +194,18 @@ class Exporter:
         doc.add_paragraph()
 
         sign_table = doc.add_table(rows=1, cols=2)
-        sign_table.style = "Table Grid"
         sign_left = sign_table.cell(0, 0)
         sign_right = sign_table.cell(0, 1)
+        self._hide_table_borders(sign_table)
 
         sign_left.text = ""
         sign_left.paragraphs[0].add_run(
-            f"От {org_name}\nНачальник участка {schedule.site_name}\n\n_____________________\n{creator_short}"
+            f"От {org_name}\nНачальник участка {schedule.site_name}\n\n_____________________ {creator_short}"
         )
 
         sign_right.text = ""
         sign_right.paragraphs[0].add_run(
-            f"От {customer_name}\n\n\n_____________________\n{customer_signer_short}"
+            f"От {customer_name}\n\n\n_____________________ {customer_signer_short}"
         )
 
         path = self._doc_path("work_schedule", schedule.number)
@@ -709,7 +709,17 @@ class Exporter:
         tblPr.append(tblBorders)
         table.cell(0, 0).text = left_label
         table.cell(0, 1).text = right_label
-
+    def _hide_table_borders(self, table) -> None:
+        from docx.oxml.ns import qn
+        from docx.oxml import OxmlElement
+        tbl = table._tbl
+        tblPr = tbl.tblPr
+        tblBorders = OxmlElement("w:tblBorders")
+        for border_name in ["top", "left", "bottom", "right", "insideH", "insideV"]:
+            border = OxmlElement(f"w:{border_name}")
+            border.set(qn("w:val"), "none")
+            tblBorders.append(border)
+        tblPr.append(tblBorders)
     def _add_signature_borderless(self, document, left_label: str, right_label: str, left_name: str, right_name: str) -> None:
         from docx.oxml.ns import qn
         from docx.oxml import OxmlElement
