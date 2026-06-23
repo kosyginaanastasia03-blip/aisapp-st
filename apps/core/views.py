@@ -585,6 +585,17 @@ def _stage_status(line) -> str:
         return "Ожидается начало"
     return "Не начат"
 
+SUPPLIER_HIDDEN_STATUSES = {DocumentStatus.SENT_ACCOUNTING, DocumentStatus.ACCEPTED}
+_APPROVED_LABEL = dict(DocumentStatus.choices)[DocumentStatus.APPROVED]
+
+
+def _status_label_for_role(role: str | None, status: str, label: str) -> str:
+    """Поставщику не показываем внутренние статусы бухгалтерии — для него
+    документ, ушедший дальше 'Утвержден', выглядит как 'Утвержден'."""
+    if role == RoleChoices.SUPPLIER and status in SUPPLIER_HIDDEN_STATUSES:
+        return _APPROVED_LABEL
+    return label
+
 def _client_ip(request: HttpRequest) -> str | None:
     forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
     if forwarded:
@@ -856,8 +867,11 @@ def _catalog_rows(
     can_manage: bool,
     entity_type: str | None = None,
     editing_id: int | None = None,
+    user=None,
     limit: int = 20,
 ) -> list[dict[str, Any]]:
+    role = getattr(user, "role", None)
+    status_col_index = next((idx for idx, (header, _g) in enumerate(columns) if header == "Статус"), None)
     rows: list[dict[str, Any]] = []
     for item in queryset[:limit]:
         item_status = getattr(item, "status", None)
@@ -871,10 +885,13 @@ def _catalog_rows(
         )
         schedule_scan_url = schedule.attachment.url if schedule and schedule.attachment else ""
         schedule_id = schedule.pk if schedule else None
+        cells = [_format_value(getter(item)) for _header, getter in columns]
+        if status_col_index is not None and item_status is not None:
+            cells[status_col_index] = _status_label_for_role(role, item_status, cells[status_col_index])
         rows.append(
             {
                 "id": item.pk,
-                "cells": [_format_value(getter(item)) for _header, getter in columns],
+                "cells": cells,
                 "can_manage": can_manage,
                 "can_edit": can_edit,
                 "edit_url": f"{reverse('catalog-page', kwargs={'slug': slug})}?edit={item.pk}",
@@ -900,6 +917,8 @@ def _operation_rows(
     user=None,
     limit: int = 20,
 ) -> list[dict[str, Any]]:
+    role = getattr(user, "role", None)
+    status_col_index = next((idx for idx, (header, _g) in enumerate(columns) if header == "Статус"), None)
     rows: list[dict[str, Any]] = []
     for item in queryset[:limit]:
         record = DocumentRecord.objects.filter(entity_type=entity_type, entity_id=item.pk).first() if entity_type else None
@@ -911,10 +930,15 @@ def _operation_rows(
         if entity_type == "supplier_document" and hasattr(item, "payment_order") and item.payment_order:
             payment_order_url = item.payment_order.url
 
+        cells = [_format_value(getter(item)) for _header, getter in columns]
+        item_status = getattr(item, "status", None)
+        if status_col_index is not None and item_status is not None:
+            cells[status_col_index] = _status_label_for_role(role, item_status, cells[status_col_index])
+
         rows.append(
             {
                 "id": item.pk,
-                "cells": [_format_value(getter(item)) for _header, getter in columns],
+                "cells": cells,
                 "export_url": _export_url(entity_type, item),
                 "scan_url": item.attachment.url if getattr(item, "attachment", None) and item.attachment else "",
                 "record_id": record.pk if record else "",
@@ -1398,6 +1422,7 @@ def catalog_page(request: HttpRequest, slug: str) -> HttpResponse:
             can_manage=can_create,
             entity_type=config.get("entity_type"),
             editing_id=instance.pk if instance else None,
+            user=request.user,
         ),
         "catalog_has_manage_actions": can_create,
         "catalog_has_export_actions": bool(config.get("entity_type")),
@@ -1739,7 +1764,11 @@ def documents(request: HttpRequest) -> HttpResponse:
     ]
 
     for record in records:
-        record.display_status = workflow_status_label(record.entity_type, record.status)
+        record.display_status = _status_label_for_role(
+            getattr(request.user, "role", None),
+            record.status,
+            workflow_status_label(record.entity_type, record.status),
+        )
         record.available_status_choices = [(record.status, record.display_status)]
         record.can_update_status = False
         record.scan_url = _record_scan_url(record)
@@ -1795,7 +1824,11 @@ def archive(request: HttpRequest) -> HttpResponse:
     filters = _archive_filters(form.cleaned_data) if form.is_valid() else {}
     records = document_records(filters, user=request.user, archived_only=True)
     for record in records:
-        record.display_status = workflow_status_label(record.entity_type, record.status)
+        record.display_status = _status_label_for_role(
+            getattr(request.user, "role", None),
+            record.status,
+            workflow_status_label(record.entity_type, record.status),
+        )
         record.available_status_choices = [(record.status, record.display_status)]
         record.can_update_status = False
         record.scan_url = _record_scan_url(record)
