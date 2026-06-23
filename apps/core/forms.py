@@ -54,7 +54,7 @@ class ConstructionObjectSelectWidget(forms.Select):
     Добавляет data-customer-name атрибут к каждому option для подтягивания заказчика через JavaScript
     """
     def create_option(self, name, value, label, selected, index, attrs=None, renderer=None, **kwargs):
-        option = super().create_option(name, value, label, selected, index, attrs, renderer, **kwargs)
+        option = super().create_option(name, value, label, selected, index, attrs, renderer)
         
         # Пытаемся получить объект строительства и добавить его customer_name
         if value:
