@@ -196,6 +196,7 @@ CATALOG_CONFIG: dict[str, dict[str, Any]] = {
             ("Эл. почта", lambda obj: obj.email),
         ],
         "allowed_roles": {RoleChoices.DIRECTOR, RoleChoices.PROCUREMENT},
+        "read_only_roles": {RoleChoices.PROCUREMENT},
     },
     "objects": {
         "title": "Строительные объекты",
