@@ -1084,7 +1084,6 @@ class SMRContractForm(BaseStyledForm, forms.ModelForm):
             "attachment": "Локальная смета (Excel/PDF)",
         }
         widgets = {
-            # ⭐ КАСТОМНЫЙ WIDGET ДЛЯ OBJECT
             "object": ConstructionObjectSelectWidget(attrs={"class": "form-input"}),
             "contract_date": DateInput(),
             "start_date": DateInput(),
