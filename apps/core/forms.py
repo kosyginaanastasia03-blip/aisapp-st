@@ -47,6 +47,26 @@ class DateInput(forms.DateInput):
         super().__init__(*args, **kwargs)
 
 
+# ⭐ КАСТОМНЫЙ WIDGET ДЛЯ ДОБАВЛЕНИЯ data-customer-name К OPTION
+class ConstructionObjectSelectWidget(forms.Select):
+    """
+    Custom widget для select объектов строительства.
+    Добавляет data-customer-name атрибут к каждому option для подтягивания заказчика через JavaScript
+    """
+    def create_option(self, name, value, label, selected, index, attrs=None, renderer=None):
+        option = super().create_option(name, value, label, selected, index, attrs, renderer)
+        
+        # Пытаемся получить объект строительства и добавить его customer_name
+        if value:
+            try:
+                obj = ConstructionObject.objects.get(pk=value)
+                option['attrs']['data-customer-name'] = obj.customer_name or ""
+            except ConstructionObject.DoesNotExist:
+                option['attrs']['data-customer-name'] = ""
+        
+        return option
+
+
 EMPTY_CHOICE_LABEL = "Не выбрано"
 
 
@@ -958,6 +978,18 @@ class SMRContractForm(BaseStyledForm, forms.ModelForm):
         widget=forms.HiddenInput(attrs={"data-items-mode": "work-lines"}),
         label="Виды работ (смета)",
     )
+    # ⭐ ПОЛЕ ЗАКАЗЧИКА С READONLY
+    customer_name = forms.CharField(
+        max_length=255,
+        required=False,
+        label="Заказчик (подтягивается автоматически)",
+        widget=forms.TextInput(attrs={
+            "class": "form-input",
+            "readonly": "readonly",
+        }),
+        help_text="Заполняется автоматически при выборе объекта строительства",
+    )
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if "customer_name" in self.fields:
@@ -981,6 +1013,10 @@ class SMRContractForm(BaseStyledForm, forms.ModelForm):
 
         if not cleaned_data.get("object"):
             self.add_error("object", "Выберите объект строительства.")
+        else:
+            # ⭐ ПОДТЯГИВАЕМ customer_name ИЗ ОБЪЕКТА
+            if construction_object and construction_object.customer_name:
+                cleaned_data["customer_name"] = construction_object.customer_name
         
         profile = getattr(settings, "ORGANIZATION_PROFILE", {}) or {}
         contractor_name = (cleaned_data.get("contractor_name") or "").strip()
@@ -999,6 +1035,7 @@ class SMRContractForm(BaseStyledForm, forms.ModelForm):
             "number",
             "contract_date",
             "object",
+            "customer_name",  # ⭐ ДОБАВЛЕНО ЗДЕСЬ (с запятой!)
             "subject",
             "amount",
             "vat_rate",
@@ -1023,6 +1060,7 @@ class SMRContractForm(BaseStyledForm, forms.ModelForm):
             "number": "Номер",
             "contract_date": "Дата договора",
             "object": "Объект строительства",
+            "customer_name": "Заказчик (подтягивается автоматически)",  # ⭐ LABEL
             "customer_signer_name": "ФИО подписанта заказчика",
             "customer_signer_position": "Должность подписанта заказчика",
             "customer_signer_name_genitive": "ФИО подписанта заказчика (родительный падеж)",
@@ -1046,6 +1084,8 @@ class SMRContractForm(BaseStyledForm, forms.ModelForm):
             "attachment": "Локальная смета (Excel/PDF)",
         }
         widgets = {
+            # ⭐ КАСТОМНЫЙ WIDGET ДЛЯ OBJECT
+            "object": ConstructionObjectSelectWidget(attrs={"class": "form-input"}),
             "contract_date": DateInput(),
             "start_date": DateInput(),
             "end_date": DateInput(),
