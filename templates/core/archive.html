@@ -129,19 +129,28 @@
                                                 {% if record.entity_type == "supplier_document" %}
                                                     {% with doc_type_lower=record.doc_type|lower %}
                                                     {% if "счет" in doc_type_lower or "счёт" in doc_type_lower %}
-                                                    <div class="payment-order-field" data-payment-order-field hidden>
-                                                        <label class="field-label" style="font-size:0.85em;margin-top:4px;display:block;">
-                                                            Платёжное поручение <span style="color:var(--color-danger)">*</span>
-                                                        </label>
-                                                        <input type="file"
-                                                            name="payment_order"
-                                                            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                                                            class="form-input compact-input"
-                                                            data-payment-order-input>
-                                                        <span class="field-help" style="font-size:0.8em;">
-                                                            PDF, изображение или документ Word
-                                                        </span>
-                                                    </div>
+                                                        {% if record.payment_order_url %}
+                                                        <div class="payment-order-field" data-payment-order-field hidden>
+                                                            <span class="field-help" style="font-size:0.85em;display:block;">
+                                                                Платёжное поручение уже загружено —
+                                                                <a href="{{ record.payment_order_url }}" target="_blank">открыть</a>
+                                                            </span>
+                                                        </div>
+                                                        {% else %}
+                                                        <div class="payment-order-field" data-payment-order-field hidden>
+                                                            <label class="field-label" style="font-size:0.85em;margin-top:4px;display:block;">
+                                                                Платёжное поручение <span style="color:var(--color-danger)">*</span>
+                                                            </label>
+                                                            <input type="file"
+                                                                name="payment_order"
+                                                                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                                                                class="form-input compact-input"
+                                                                data-payment-order-input>
+                                                            <span class="field-help" style="font-size:0.8em;">
+                                                                PDF, изображение или документ Word
+                                                            </span>
+                                                        </div>
+                                                        {% endif %}
                                                     {% endif %}
                                                     {% endwith %}
                                                 {% endif %}

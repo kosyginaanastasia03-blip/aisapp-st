@@ -180,7 +180,7 @@ CATALOG_CONFIG: dict[str, dict[str, Any]] = {
             ("Категория", lambda obj: obj.category),
             ("СИЗ", lambda obj: obj.is_ppe),
         ],
-        "allowed_roles": {RoleChoices.ADMIN, RoleChoices.DIRECTOR, RoleChoices.WAREHOUSE, RoleChoices.PROCUREMENT},
+        "allowed_roles": {RoleChoices.DIRECTOR, RoleChoices.WAREHOUSE, RoleChoices.PROCUREMENT},
         "read_only_roles": {RoleChoices.DIRECTOR, RoleChoices.WAREHOUSE},
     },
     "suppliers": {
@@ -195,7 +195,7 @@ CATALOG_CONFIG: dict[str, dict[str, Any]] = {
             ("Телефон", lambda obj: obj.phone),
             ("Эл. почта", lambda obj: obj.email),
         ],
-        "allowed_roles": {RoleChoices.ADMIN, RoleChoices.DIRECTOR, RoleChoices.PROCUREMENT},
+        "allowed_roles": {RoleChoices.DIRECTOR, RoleChoices.PROCUREMENT},
     },
     "objects": {
         "title": "Строительные объекты",
@@ -207,7 +207,7 @@ CATALOG_CONFIG: dict[str, dict[str, Any]] = {
             ("Заказчик", lambda obj: obj.customer_name),
             ("Адрес", lambda obj: obj.address),
         ],
-        "allowed_roles": {RoleChoices.ADMIN, RoleChoices.DIRECTOR, RoleChoices.PROCUREMENT, RoleChoices.SITE_MANAGER},
+        "allowed_roles": {RoleChoices.DIRECTOR, RoleChoices.PROCUREMENT, RoleChoices.SITE_MANAGER},
         "read_only_roles": {RoleChoices.PROCUREMENT, RoleChoices.SITE_MANAGER},
     },
     "workers": {
@@ -290,9 +290,9 @@ CATALOG_CONFIG: dict[str, dict[str, Any]] = {
             ("Остаток", lambda obj: _supply_contract_remaining(obj)),
             ("Статус", lambda obj: obj.get_status_display()),
         ],
-        "allowed_roles": {RoleChoices.ADMIN, RoleChoices.DIRECTOR, RoleChoices.PROCUREMENT, RoleChoices.SUPPLIER},
+        "allowed_roles": {RoleChoices.DIRECTOR, RoleChoices.PROCUREMENT, RoleChoices.SUPPLIER},
         "scoped_roles": {RoleChoices.SUPPLIER},
-        "read_only_roles": {RoleChoices.SUPPLIER},
+        "read_only_roles": {RoleChoices.SUPPLIER, RoleChoices.PROCUREMENT},
         "entity_type": "supply_contract",
     },
     "document-types": {

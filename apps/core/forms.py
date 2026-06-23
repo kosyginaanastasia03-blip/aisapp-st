@@ -668,6 +668,21 @@ class ArchiveFilterForm(DateRangeValidationMixin, BaseStyledForm, forms.Form):
         if getattr(self.user, 'role', None) == RoleChoices.SUPPLIER:
             self.fields.pop("counterparty", None)
             self.fields.pop("object_name", None)
+            # Поставщику нужны только статусы, относящиеся к его этапу работы с документом
+            if "status" in self.fields:
+                supplier_visible_statuses = {
+                    DocumentStatus.DRAFT,
+                    DocumentStatus.UPLOADED,
+                    DocumentStatus.SUPPLY_CONFIRMED,
+                    DocumentStatus.APPROVAL,
+                    DocumentStatus.REWORK,
+                    DocumentStatus.APPROVED,
+                }
+                self.fields["status"].choices = [("", "Все")] + [
+                    (value, label)
+                    for value, label in DocumentStatus.choices
+                    if value in supplier_visible_statuses
+                ]
         # В архиве все документы со статусом «Принят» — фильтр статуса не нужен
         if self.is_archive:
             self.fields.pop("status", None)
