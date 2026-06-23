@@ -526,7 +526,14 @@ def filter_queryset_for_user(user, queryset):
         if model is SupplyContract:
             return queryset.filter(supplier=user.supplier)
         if model is ProcurementRequest:
-            return queryset.filter(supplier=user.supplier)
+            return queryset.filter(
+                supplier=user.supplier,
+                status__in=[
+                    DocumentStatus.APPROVED,      # Утвержден
+                    DocumentStatus.SENT_ACCOUNTING,  # Отправлен в бухгалтерию
+                    DocumentStatus.ACCEPTED,      # Принят
+                ],
+            )
         if model is SupplierDocument:
             return queryset.filter(supplier=user.supplier)
         if model is PrimaryDocument:
