@@ -128,8 +128,10 @@
                     <option value="черновик">Черновик</option>
                     <option value="на утверждении">На утверждении</option>
                     <option value="утвержден">Утвержден</option>
-                    <option value="отправлен в бухгалтерию">Отправлен в бухгалтерию</option>
-                    <option value="принят">Принят</option>
+                    {% if request.user.role != 'supplier' %}
+                        <option value="отправлен в бухгалтерию">Отправлен в бухгалтерию</option>
+                        <option value="принят">Принят</option>
+                    {% endif %}
                     <option value="возвращен на доработку">Возвращен на доработку</option>
                     <option value="загружен поставщиком">Загружен поставщиком</option>
                     <option value="подтверждение поставки">Подтверждение поставки</option>
