@@ -873,7 +873,7 @@ class ConstructionObjectForm(BaseStyledForm, forms.ModelForm):
             "customer_legal_address", "customer_tax_id", "customer_kpp",
             "customer_ogrn", "customer_bank", "customer_bik",
             "customer_account", "customer_corr_account", "customer_okpo",
-            "customer_requisites", "description", "start_date", "end_date",
+            "customer_requisites", "description",
         ]
         labels = {
             "name": "Наименование объекта",
@@ -891,14 +891,10 @@ class ConstructionObjectForm(BaseStyledForm, forms.ModelForm):
             "customer_okpo": "ОКПО",
             "customer_requisites": "Реквизиты (текстом, если нужно)",
             "description": "Описание",
-            "start_date": "Дата начала",
-            "end_date": "Дата окончания",
         }
         widgets = {
             "customer_requisites": forms.Textarea(attrs={"rows": 3}),
             "description": forms.Textarea(attrs={"rows": 3}),
-            "start_date": DateInput(),
-            "end_date": DateInput(),
         }
 
 

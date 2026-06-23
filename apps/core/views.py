@@ -206,8 +206,6 @@ CATALOG_CONFIG: dict[str, dict[str, Any]] = {
             ("Объект", lambda obj: obj.name),
             ("Заказчик", lambda obj: obj.customer_name),
             ("Адрес", lambda obj: obj.address),
-            ("Начало", lambda obj: obj.start_date),
-            ("Окончание", lambda obj: obj.end_date),
         ],
         "allowed_roles": {RoleChoices.ADMIN, RoleChoices.DIRECTOR, RoleChoices.PROCUREMENT, RoleChoices.SITE_MANAGER},
         "read_only_roles": {RoleChoices.PROCUREMENT, RoleChoices.SITE_MANAGER},
@@ -267,7 +265,7 @@ CATALOG_CONFIG: dict[str, dict[str, Any]] = {
         "columns": [
             ("Номер", lambda obj: obj.number),
             ("Дата", lambda obj: obj.contract_date),
-            ("Заказчик", lambda obj: obj.customer_name),
+            ("Заказчик", lambda obj: obj.resolved_customer_name() or ""),
             ("Объект", lambda obj: obj.object.name if obj.object else ""),
             ("Сумма", lambda obj: obj.amount),
             ("Статус", lambda obj: obj.get_status_display()),
