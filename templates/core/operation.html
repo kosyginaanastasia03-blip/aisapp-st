@@ -1724,8 +1724,9 @@ if (stageSelect) {
     materialSelect.addEventListener("change", fillUnit);
     if (materialSelect.value) fillUnit();
 })();
+
 // Подтягивание заказчика при выборе объекта (форма договора СМР)
-(() => {
+document.addEventListener("DOMContentLoaded", () => {
     const form = document.querySelector("form[data-autosave-url]");
     if (!form) return;
 
@@ -1745,28 +1746,6 @@ if (stageSelect) {
 
     objectSelect.addEventListener("change", updateCustomerName);
     updateCustomerName();
-})();
-// Подтягивание заказчика при выборе объекта (форма договора СМР)
-(() => {
-    const form = document.querySelector("form[data-autosave-url]");
-    if (!form) return;
-
-    const objectSelect = form.querySelector('select[name="object"]');
-    const customerNameInput = form.querySelector('input[name="customer_name"]');
-    
-    if (!objectSelect || !customerNameInput) return;
-
-    const updateCustomerName = () => {
-        const selectedOption = objectSelect.options[objectSelect.selectedIndex];
-        if (!selectedOption || !selectedOption.value) {
-            customerNameInput.value = "";
-            return;
-        }
-        customerNameInput.value = selectedOption.dataset.customerName || "";
-    };
-
-    objectSelect.addEventListener("change", updateCustomerName);
-    updateCustomerName();
-})();
+});
 </script>
 {% endblock %}
