@@ -56,12 +56,12 @@ class ConstructionObjectSelectWidget(forms.Select):
     def create_option(self, name, value, label, selected, index, attrs=None, renderer=None, **kwargs):
         option = super().create_option(name, value, label, selected, index, attrs, renderer)
         
-        # Пытаемся получить объект строительства и добавить его customer_name
         if value:
+            real_value = value.value if hasattr(value, 'value') else value
             try:
-                obj = ConstructionObject.objects.get(pk=value)
+                obj = ConstructionObject.objects.get(pk=real_value)
                 option['attrs']['data-customer-name'] = obj.customer_name or ""
-            except ConstructionObject.DoesNotExist:
+            except (ConstructionObject.DoesNotExist, TypeError, ValueError):
                 option['attrs']['data-customer-name'] = ""
         
         return option
