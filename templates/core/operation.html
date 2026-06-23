@@ -383,6 +383,13 @@ const CURRENT_USER_SITE = "{{ current_user_site }}";
                 amount: String(row.amount || "").trim(),
             };
         }
+       if (mode === "procurement-lines") {
+            return {
+                material_code: String(row.material_code || "").trim(),
+                quantity: String(row.quantity || "").trim(),
+                notes: String(row.notes || "").trim(),
+            };
+        }
         return {
             material_code: String(row.material_code || "").trim(),
             quantity: String(row.quantity || "").trim(),
@@ -390,13 +397,6 @@ const CURRENT_USER_SITE = "{{ current_user_site }}";
             notes: String(row.notes || "").trim(),
             reserve: String(row.reserve || "0").trim(),
         };
-        if (mode === "procurement-lines") {
-            return {
-                material_code: String(row.material_code || "").trim(),
-                quantity: String(row.quantity || "").trim(),
-                notes: String(row.notes || "").trim(),
-            };
-        }
     };
 
         const normalizedRows = rows
@@ -500,13 +500,6 @@ const CURRENT_USER_SITE = "{{ current_user_site }}";
                 amount: row.querySelector('input[data-col="amount"]')?.value || "",
             };
         }
-        return {
-            material_code: row.querySelector('input[data-col="material_code"]')?.value || "",
-            quantity: row.querySelector('input[data-col="quantity"]')?.value || "",
-            unit_price: row.querySelector('input[data-col="unit_price"]')?.value || "",
-            notes: row.querySelector('input[data-col="notes"]')?.value || "",
-            reserve: row.querySelector('input[data-col="reserve"]')?.value || "0",
-        };
         if (mode === "procurement-lines") {
             return {
                 material_code: row.querySelector('input[data-col="material_code"]')?.value || "",
@@ -514,6 +507,13 @@ const CURRENT_USER_SITE = "{{ current_user_site }}";
                 notes: row.querySelector('input[data-col="notes"]')?.value || "",
             };
         }
+        return {
+            material_code: row.querySelector('input[data-col="material_code"]')?.value || "",
+            quantity: row.querySelector('input[data-col="quantity"]')?.value || "",
+            unit_price: row.querySelector('input[data-col="unit_price"]')?.value || "",
+            notes: row.querySelector('input[data-col="notes"]')?.value || "",
+            reserve: row.querySelector('input[data-col="reserve"]')?.value || "0",
+        };
     });
 };
         const syncHiddenItems = (triggerAutosave = true) => {
