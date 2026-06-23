@@ -5,9 +5,15 @@
 {# === Сокращения для проверки роли === #}
 {% with role=request.user.role is_admin=request.user.is_superuser %}
 
+{% if is_admin %}
+<section class="hero-panel">
+    <p>Раздел «Панель управления» недоступен для технического администратора.</p>
+</section>
+{% else %}
+
 <section class="metrics-grid">
-    {# Договоры СМР — Админ, Директор, Начальник участка #}
-    {% if is_admin or role == 'admin' or role == 'director' or role == 'site_manager' %}
+    {# Договоры СМР — Директор, Начальник участка #}
+    {% if role == 'director' or role == 'site_manager' %}
     <article class="metric-card metric-materials">
         <div class="metric-icon" aria-hidden="true"><svg class="bi"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#file-earmark-text"></use></svg></div>
         <div class="metric-copy">
@@ -32,8 +38,8 @@
     </article>
     {% endif %}
 
-    {# Документы поставщиков — Админ, Директор, Снабженец, Бухгалтер, Поставщик #}
-    {% if is_admin or role == 'admin' or role == 'director' or role == 'procurement' or role == 'accounting' or role == 'supplier' %}
+    {# Документы поставщиков — Директор, Снабженец, Поставщик #}
+    {% if role == 'director' or role == 'procurement' or role == 'supplier' %}
     <article class="metric-card metric-docs">
         <div class="metric-icon" aria-hidden="true"><svg class="bi"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#journal-text"></use></svg></div>
         <div class="metric-copy">
@@ -45,8 +51,8 @@
     </article>
     {% endif %}
 
-    {# Активные задачи — Админ, Директор, Начальник участка #}
-    {% if is_admin or role == 'admin' or role == 'director' or role == 'site_manager' %}
+    {# Активные задачи — Директор, Начальник участка #}
+    {% if role == 'director' or role == 'site_manager' %}
     <article class="metric-card metric-tasks">
         <div class="metric-icon" aria-hidden="true"><svg class="bi"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#list-task"></use></svg></div>
         <div class="metric-copy">
@@ -61,8 +67,8 @@
 
 <section class="workspace-shell dashboard-workspace" data-workspace-tabs>
     <div class="workspace-switcher" role="list" aria-label="Выбор блока панели управления">
-        {# Контроль остатков — Админ, Директор, Начальник участка #}
-        {% if is_admin or role == 'admin' or role == 'director' or role == 'site_manager' %}
+        {# Контроль остатков — Директор, Начальник участка #}
+        {% if role == 'director' or role == 'site_manager' %}
         <button type="button" class="workspace-choice" data-workspace-trigger="stock-alerts" aria-controls="stock-alerts-panel" aria-pressed="false">
             <span class="workspace-choice-icon" aria-hidden="true"><svg class="bi"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#graph-up-arrow"></use></svg></span>
             <span class="workspace-choice-copy">
@@ -81,8 +87,8 @@
             </span>
         </button>
 
-        {# Остатки склада — Админ, Директор, Кладовщик, Снабженец #}
-        {% if is_admin or role == 'admin' or role == 'director' or role == 'warehouse' or role == 'procurement' %}
+        {# Остатки склада — Директор, Кладовщик, Снабженец #}
+        {% if role == 'director' or role == 'warehouse' or role == 'procurement' %}
         <button type="button" class="workspace-choice" data-workspace-trigger="warehouse" aria-controls="warehouse-balances" aria-pressed="false">
             <span class="workspace-choice-icon" aria-hidden="true"><svg class="bi"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#database"></use></svg></span>
             <span class="workspace-choice-copy">
@@ -92,8 +98,8 @@
         </button>
         {% endif %}
 
-        {# Остатки по участкам — Админ, Директор, Начальник участка #}
-        {% if is_admin or role == 'admin' or role == 'director' or role == 'site_manager' %}
+        {# Остатки по участкам — Директор, Начальник участка #}
+        {% if role == 'director' or role == 'site_manager' %}
         <button type="button" class="workspace-choice" data-workspace-trigger="site" aria-controls="site-balances" aria-pressed="false">
             <span class="workspace-choice-icon" aria-hidden="true"><svg class="bi"><use href="{% static 'vendor/bootstrap-icons/bootstrap-icons.svg' %}#buildings"></use></svg></span>
             <span class="workspace-choice-copy">
@@ -111,7 +117,7 @@
     <div class="workspace-panels">
 
     {# Контроль остатков по участкам #}
-    {% if is_admin or role == 'admin' or role == 'director' or role == 'site_manager' %}
+    {% if role == 'director' or role == 'site_manager' %}
     <article class="panel dashboard-panel workspace-panel" id="stock-alerts-panel" data-workspace-panel="stock-alerts" hidden>
         <div class="panel-head">
             <div class="panel-title-row">
@@ -210,7 +216,7 @@
     </article>
 
     {# Остатки склада #}
-    {% if is_admin or role == 'admin' or role == 'director' or role == 'warehouse' or role == 'procurement' %}
+    {% if role == 'director' or role == 'warehouse' or role == 'procurement' %}
     <article class="panel dashboard-panel workspace-panel" id="warehouse-balances" data-workspace-panel="warehouse" hidden>
         <div class="panel-head">
             <div class="panel-title-row">
@@ -259,7 +265,7 @@
     {% endif %}
 
     {# Остатки по объектам/участкам #}
-    {% if is_admin or role == 'admin' or role == 'director' or role == 'site_manager' %}
+    {% if role == 'director' or role == 'site_manager' %}
     <article class="panel dashboard-panel workspace-panel" id="site-balances" data-workspace-panel="site" hidden>
         <div class="panel-head">
             <div class="panel-title-row">
@@ -309,5 +315,6 @@
     </div>
 </section>
 
+{% endif %}
 {% endwith %}
 {% endblock %}

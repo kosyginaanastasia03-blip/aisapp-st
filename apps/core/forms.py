@@ -982,7 +982,7 @@ class SMRContractForm(BaseStyledForm, forms.ModelForm):
     customer_name = forms.CharField(
         max_length=255,
         required=False,
-        label="Заказчик (подтягивается автоматически)",
+        label="Заказчик",
         widget=forms.TextInput(attrs={
             "class": "form-input",
             "readonly": "readonly",
@@ -1060,7 +1060,7 @@ class SMRContractForm(BaseStyledForm, forms.ModelForm):
             "number": "Номер",
             "contract_date": "Дата договора",
             "object": "Объект строительства",
-            "customer_name": "Заказчик (подтягивается автоматически)",  # ⭐ LABEL
+            "customer_name": "Заказчик", 
             "customer_signer_name": "ФИО подписанта заказчика",
             "customer_signer_position": "Должность подписанта заказчика",
             "customer_signer_name_genitive": "ФИО подписанта заказчика (родительный падеж)",

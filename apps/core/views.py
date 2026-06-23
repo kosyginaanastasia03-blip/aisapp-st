@@ -180,7 +180,7 @@ CATALOG_CONFIG: dict[str, dict[str, Any]] = {
             ("Категория", lambda obj: obj.category),
             ("СИЗ", lambda obj: obj.is_ppe),
         ],
-        "allowed_roles": {RoleChoices.ADMIN, RoleChoices.DIRECTOR, RoleChoices.WAREHOUSE},
+        "allowed_roles": {RoleChoices.ADMIN, RoleChoices.DIRECTOR, RoleChoices.WAREHOUSE, RoleChoices.PROCUREMENT},
         "read_only_roles": {RoleChoices.DIRECTOR, RoleChoices.WAREHOUSE},
     },
     "suppliers": {
