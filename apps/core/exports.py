@@ -1822,6 +1822,17 @@ class Exporter:
                 _left_signer = _supplier_signer
                 _right_signer = self._short_name(uploaded_by_name) if uploaded_by_name else _supplier_signer
 
+            if item.supply_contract and item.supply_contract.contract_date:
+                contract_date = item.supply_contract.contract_date
+                basis_document = (
+                    f'Договор № {item.supply_contract.number} от '
+                    f'"{contract_date.day:02d}" {MONTH_NAMES[contract_date.month - 1]} {contract_date.year} г.'
+                )
+            elif item.request:
+                basis_document = item.request.number
+            else:
+                basis_document = ""
+
             context = {
                 **self._template_common_context(),
                 "INVOICE_NUMBER": item.doc_number,
@@ -1865,7 +1876,7 @@ class Exporter:
                 "TOTAL_TO_PAY_WORDS": f"{money(item.amount)} руб.",
                 "VAT_AMOUNT": money(item.vat_amount),
                 "VAT_RATE": f"{int(item.vat_rate or 20)}%",
-                "BASIS_DOCUMENT": item.request.number if item.request else "",
+                "BASIS_DOCUMENT": basis_document,
                 "ITEMS_COUNT": len(lines_data),
                 "TOTAL_AMOUNT_NO_VAT": money(Decimal(item.amount or 0) - Decimal(item.vat_amount or 0)),
                 "TOTAL_AMOUNT_WITH_VAT": money(item.amount),
