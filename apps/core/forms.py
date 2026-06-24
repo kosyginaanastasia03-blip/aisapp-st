@@ -221,12 +221,7 @@ class SiteMaterialRequestCreateForm(BaseStyledForm, forms.Form):
     request_date = forms.DateField(widget=DateInput(), initial=timezone.localdate, label="Дата заявки")
     site_name = forms.CharField(max_length=255, label="Участок")
     contract = forms.ModelChoiceField(
-        queryset=SMRContract.objects.exclude(
-            id__in=SiteMaterialRequest.objects.filter(
-                status__in=[DocumentStatus.APPROVAL, DocumentStatus.APPROVED,
-                            DocumentStatus.SENT_ACCOUNTING, DocumentStatus.ACCEPTED]
-            ).exclude(contract=None).values_list("contract_id", flat=True)
-        ).order_by("-contract_date"),
+        queryset=SMRContract.objects.all(),
         required=False,
         label="Договор СМР"
     )
@@ -238,6 +233,18 @@ class SiteMaterialRequestCreateForm(BaseStyledForm, forms.Form):
 
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
+        # Договоры которые уже использованы в заявке кладовщику
+        busy_contract_ids = SiteMaterialRequest.objects.filter(
+            status__in=[
+                DocumentStatus.APPROVAL, DocumentStatus.APPROVED,
+                DocumentStatus.SENT_ACCOUNTING, DocumentStatus.ACCEPTED,
+            ]
+        ).exclude(contract=None).values_list("contract_id", flat=True)
+
+        self.fields["contract"].queryset = SMRContract.objects.exclude(
+            id__in=busy_contract_ids
+        ).order_by("-contract_date")
+
         if user and getattr(user, "role", None) == RoleChoices.SITE_MANAGER:
             site_name = getattr(user, "site_name", "") or ""
             self.fields["site_name"].initial = site_name
@@ -439,9 +446,17 @@ class StockIssueCreateForm(BaseStyledForm, forms.Form):
         self.fields["site_name"].choices = choices
         self.fields["received_by_user"].label_from_instance = lambda obj: obj.full_name_or_username
 
+        # Заявки участка которые уже использованы в требовании-накладной
+        busy_site_request_ids = StockIssue.objects.filter(
+            status__in=[
+                DocumentStatus.APPROVAL, DocumentStatus.APPROVED,
+                DocumentStatus.SENT_ACCOUNTING, DocumentStatus.ACCEPTED,
+            ]
+        ).exclude(site_request=None).values_list("site_request_id", flat=True)
+
         approved_requests = SiteMaterialRequest.objects.filter(
             status__in=[DocumentStatus.APPROVED, DocumentStatus.ACCEPTED, DocumentStatus.SENT_ACCOUNTING]
-        ).order_by("-request_date")
+        ).exclude(id__in=busy_site_request_ids).order_by("-request_date")
         self.fields["site_request"].widget.choices = [("", "Не выбрано")] + [
             (r.pk, str(r)) for r in approved_requests
         ]
@@ -501,11 +516,14 @@ class WriteOffCreateForm(BaseStyledForm, forms.Form):
 
         template_variant = self.data.get("template_variant") or (self.initial.get("template_variant") or WriteOffTemplateVariant.CONTRACT)
         # Договоры которые уже на утверждении в акте списания
+        # Защита отдельная для каждого варианта формы:
+        # один и тот же договор можно использовать в обычном списании И в хознуждах
         busy_contract_ids = WriteOffAct.objects.filter(
             status__in=[
                 DocumentStatus.APPROVAL, DocumentStatus.APPROVED,
                 DocumentStatus.SENT_ACCOUNTING, DocumentStatus.ACCEPTED,
-            ]
+            ],
+            template_variant=template_variant,
         ).exclude(contract=None).values_list("contract_id", flat=True)
 
         if template_variant == WriteOffTemplateVariant.PRODUCTION_ECONOMIC:
@@ -625,17 +643,27 @@ class WorkAcceptanceCreateForm(BaseStyledForm, forms.Form):
     )
     act_date = forms.DateField(widget=DateInput(), initial=timezone.localdate, label="Дата акта")
     contract = forms.ModelChoiceField(
-        queryset=SMRContract.objects.exclude(
-            id__in=WorkAcceptanceAct.objects.filter(
-                status__in=[DocumentStatus.APPROVAL, DocumentStatus.APPROVED,
-                            DocumentStatus.SENT_ACCOUNTING, DocumentStatus.ACCEPTED]
-            ).values_list("contract_id", flat=True)
-        ).order_by("-contract_date"),
+        queryset=SMRContract.objects.all(),
         label="Договор СМР"
     )
     site_name = forms.CharField(max_length=255, label="Участок")
     work_description = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 3}), label="Описание выполненных работ")
     amount = forms.DecimalField(max_digits=14, decimal_places=2, required=False, label="Сумма по акту")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Договоры которые уже использованы в акте сдачи-приёмки
+        busy_contract_ids = WorkAcceptanceAct.objects.filter(
+            status__in=[
+                DocumentStatus.APPROVAL, DocumentStatus.APPROVED,
+                DocumentStatus.SENT_ACCOUNTING, DocumentStatus.ACCEPTED,
+            ]
+        ).values_list("contract_id", flat=True)
+
+        self.fields["contract"].queryset = SMRContract.objects.exclude(
+            id__in=busy_contract_ids
+        ).order_by("-contract_date")
+
     def clean_number(self):
         number = (self.cleaned_data.get("number") or "").strip()
         if number and WorkAcceptanceAct.objects.filter(number__iexact=number).exists():
