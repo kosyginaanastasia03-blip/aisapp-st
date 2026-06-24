@@ -956,9 +956,51 @@ class ConstructionObjectForm(BaseStyledForm, forms.ModelForm):
             "description": "Описание",
         }
         widgets = {
-            "customer_requisites": forms.Textarea(attrs={"rows": 3}),
-            "description": forms.Textarea(attrs={"rows": 3}),
-        }
+    "customer_requisites": forms.Textarea(attrs={"rows": 3}),
+    "description": forms.Textarea(attrs={"rows": 3}),
+    "customer_tax_id": forms.TextInput(attrs={
+        "inputmode": "numeric",
+        "pattern": "[0-9]*",
+        "maxlength": "12",
+        "oninput": "this.value=this.value.replace(/[^0-9]/g,'')",
+    }),
+    "customer_kpp": forms.TextInput(attrs={
+        "inputmode": "numeric",
+        "pattern": "[0-9]*",
+        "maxlength": "9",
+        "oninput": "this.value=this.value.replace(/[^0-9]/g,'')",
+    }),
+    "customer_ogrn": forms.TextInput(attrs={
+        "inputmode": "numeric",
+        "pattern": "[0-9]*",
+        "maxlength": "13",
+        "oninput": "this.value=this.value.replace(/[^0-9]/g,'')",
+    }),
+    "customer_bik": forms.TextInput(attrs={
+        "inputmode": "numeric",
+        "pattern": "[0-9]*",
+        "maxlength": "9",
+        "oninput": "this.value=this.value.replace(/[^0-9]/g,'')",
+    }),
+    "customer_okpo": forms.TextInput(attrs={
+        "inputmode": "numeric",
+        "pattern": "[0-9]*",
+        "maxlength": "10",
+        "oninput": "this.value=this.value.replace(/[^0-9]/g,'')",
+    }),
+    "customer_account": forms.TextInput(attrs={
+        "inputmode": "numeric",
+        "pattern": "[0-9]*",
+        "maxlength": "20",
+        "oninput": "this.value=this.value.replace(/[^0-9]/g,'')",
+    }),
+    "customer_corr_account": forms.TextInput(attrs={
+        "inputmode": "numeric",
+        "pattern": "[0-9]*",
+        "maxlength": "20",
+        "oninput": "this.value=this.value.replace(/[^0-9]/g,'')",
+    }),
+}
 
 
 class WorkerForm(BaseStyledForm, forms.ModelForm):
