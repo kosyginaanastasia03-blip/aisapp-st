@@ -956,51 +956,86 @@ class ConstructionObjectForm(BaseStyledForm, forms.ModelForm):
             "description": "Описание",
         }
         widgets = {
-    "customer_requisites": forms.Textarea(attrs={"rows": 3}),
-    "description": forms.Textarea(attrs={"rows": 3}),
-    "customer_tax_id": forms.TextInput(attrs={
-        "inputmode": "numeric",
-        "pattern": "[0-9]*",
-        "maxlength": "12",
-        "oninput": "this.value=this.value.replace(/[^0-9]/g,'')",
-    }),
-    "customer_kpp": forms.TextInput(attrs={
-        "inputmode": "numeric",
-        "pattern": "[0-9]*",
-        "maxlength": "9",
-        "oninput": "this.value=this.value.replace(/[^0-9]/g,'')",
-    }),
-    "customer_ogrn": forms.TextInput(attrs={
-        "inputmode": "numeric",
-        "pattern": "[0-9]*",
-        "maxlength": "13",
-        "oninput": "this.value=this.value.replace(/[^0-9]/g,'')",
-    }),
-    "customer_bik": forms.TextInput(attrs={
-        "inputmode": "numeric",
-        "pattern": "[0-9]*",
-        "maxlength": "9",
-        "oninput": "this.value=this.value.replace(/[^0-9]/g,'')",
-    }),
-    "customer_okpo": forms.TextInput(attrs={
-        "inputmode": "numeric",
-        "pattern": "[0-9]*",
-        "maxlength": "10",
-        "oninput": "this.value=this.value.replace(/[^0-9]/g,'')",
-    }),
-    "customer_account": forms.TextInput(attrs={
-        "inputmode": "numeric",
-        "pattern": "[0-9]*",
-        "maxlength": "20",
-        "oninput": "this.value=this.value.replace(/[^0-9]/g,'')",
-    }),
-    "customer_corr_account": forms.TextInput(attrs={
-        "inputmode": "numeric",
-        "pattern": "[0-9]*",
-        "maxlength": "20",
-        "oninput": "this.value=this.value.replace(/[^0-9]/g,'')",
-    }),
-}
+            "customer_requisites": forms.Textarea(attrs={"rows": 3}),
+            "description": forms.Textarea(attrs={"rows": 3}),
+            "customer_tax_id": forms.TextInput(attrs={
+                "inputmode": "numeric",
+                "pattern": "[0-9]*",
+                "maxlength": "12",
+                "oninput": "this.value=this.value.replace(/[^0-9]/g,'')",
+            }),
+            "customer_kpp": forms.TextInput(attrs={
+                "inputmode": "numeric",
+                "pattern": "[0-9]*",
+                "maxlength": "9",
+                "oninput": "this.value=this.value.replace(/[^0-9]/g,'')",
+            }),
+            "customer_ogrn": forms.TextInput(attrs={
+                "inputmode": "numeric",
+                "pattern": "[0-9]*",
+                "maxlength": "13",
+                "oninput": "this.value=this.value.replace(/[^0-9]/g,'')",
+            }),
+            "customer_bik": forms.TextInput(attrs={
+                "inputmode": "numeric",
+                "pattern": "[0-9]*",
+                "maxlength": "9",
+                "oninput": "this.value=this.value.replace(/[^0-9]/g,'')",
+            }),
+            "customer_okpo": forms.TextInput(attrs={
+                "inputmode": "numeric",
+                "pattern": "[0-9]*",
+                "maxlength": "10",
+                "oninput": "this.value=this.value.replace(/[^0-9]/g,'')",
+            }),
+            "customer_account": forms.TextInput(attrs={
+                "inputmode": "numeric",
+                "pattern": "[0-9]*",
+                "maxlength": "20",
+                "oninput": "this.value=this.value.replace(/[^0-9]/g,'')",
+            }),
+            "customer_corr_account": forms.TextInput(attrs={
+                "inputmode": "numeric",
+                "pattern": "[0-9]*",
+                "maxlength": "20",
+                "oninput": "this.value=this.value.replace(/[^0-9]/g,'')",
+            }),
+        }
+
+    def _clean_digits(self, value, allowed_lengths, label):
+        value = (value or "").strip()
+        if not value:
+            return value
+        if not value.isdigit():
+            raise forms.ValidationError(f"{label} должен содержать только цифры.")
+        if len(value) not in allowed_lengths:
+            if len(allowed_lengths) == 1:
+                expected = f"{allowed_lengths[0]} цифр"
+            else:
+                expected = " или ".join(f"{n} цифр" for n in allowed_lengths)
+            raise forms.ValidationError(f"{label} должен содержать {expected} (введено {len(value)}).")
+        return value
+
+    def clean_customer_tax_id(self):
+        return self._clean_digits(self.cleaned_data.get("customer_tax_id"), (10, 12), "ИНН")
+
+    def clean_customer_kpp(self):
+        return self._clean_digits(self.cleaned_data.get("customer_kpp"), (9,), "КПП")
+
+    def clean_customer_ogrn(self):
+        return self._clean_digits(self.cleaned_data.get("customer_ogrn"), (13,), "ОГРН")
+
+    def clean_customer_bik(self):
+        return self._clean_digits(self.cleaned_data.get("customer_bik"), (9,), "БИК")
+
+    def clean_customer_okpo(self):
+        return self._clean_digits(self.cleaned_data.get("customer_okpo"), (8, 10), "ОКПО")
+
+    def clean_customer_account(self):
+        return self._clean_digits(self.cleaned_data.get("customer_account"), (20,), "Расчётный счёт")
+
+    def clean_customer_corr_account(self):
+        return self._clean_digits(self.cleaned_data.get("customer_corr_account"), (20,), "Корреспондентский счёт")
 
 
 class WorkerForm(BaseStyledForm, forms.ModelForm):
