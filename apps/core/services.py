@@ -450,7 +450,7 @@ def filter_queryset_for_user(user, queryset):
         return queryset
  
     if role == RoleChoices.PROCUREMENT:
-        if model in {Supplier, ConstructionObject, SupplyContract, ProcurementRequest, SupplierDocument, PrimaryDocument}:
+        if model in {Material, Supplier, ConstructionObject, SupplyContract, ProcurementRequest, SupplierDocument, PrimaryDocument}:
             return queryset
         if model is SiteMaterialRequest:
             return queryset.filter(status=DocumentStatus.ACCEPTED)
@@ -1074,7 +1074,13 @@ def _notify_status_event(*, actor, record: DocumentRecord, previous_status: str 
         )
     if record.status in {DocumentStatus.APPROVED, DocumentStatus.ACCEPTED, DocumentStatus.REWORK} and record.created_by_id:
         recipients.append(record.created_by)
- 
+
+    # Уведомление начальника участка, назначенного ответственным по договору СМР
+    if record.entity_type == "smr_contract":
+        contract = SMRContract.objects.filter(pk=record.entity_id).select_related("site_manager").first()
+        if contract and contract.site_manager_id:
+            recipients.append(contract.site_manager)
+
     previous_label = workflow_status_label(record.entity_type, previous_status) if previous_status else ""
     status_label = workflow_status_label(record.entity_type, record.status)
     if previous_label:

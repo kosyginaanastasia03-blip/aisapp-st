@@ -939,6 +939,18 @@ class Exporter:
         payer_account = self._extract_requisite(organization_requisites_raw, r"(?:р/с|расчетный\s+счет|расч[её]тный\s+счет)\s*[:№#-]?\s*([0-9]{20})")
         payer_corr_account = self._extract_requisite(organization_requisites_raw, r"(?:к/с|корр\.?\s*счет|корреспондентский\s+счет)\s*[:№#-]?\s*([0-9]{20})")
         payer_bik = self._extract_requisite(organization_requisites_raw, r"БИК\s*[:№#-]?\s*([0-9]{9})")
+        if item.supply_contract and item.supply_contract.contract_date:
+            contract_date = item.supply_contract.contract_date
+            basis_document = (
+                f'Договор № {item.supply_contract.number} от '
+                f'"{contract_date.day:02d}" {MONTH_NAMES[contract_date.month - 1]} {contract_date.year} г.'
+            )
+        elif item.basis_reference:
+            basis_document = item.basis_reference
+        elif item.procurement_request:
+            basis_document = item.procurement_request.number
+        else:
+            basis_document = ""
         context: dict[str, Any] = {
             **self._template_common_context(),
             "DOCUMENT_NUMBER": item.number,
@@ -953,7 +965,8 @@ class Exporter:
             "PAYMENT_DATE": self._date_text(item.doc_date),
             "DEBITED_DATE": "",
             "RECEIVED_BY_BANK_DATE": "",
-            "BASIS_DOCUMENT": item.basis_reference or (item.procurement_request.number if item.procurement_request else ""),
+            "BASIS_DOCUMENT": basis_document,
+            #"BASIS_DOCUMENT": item.basis_reference or (item.procurement_request.number if item.procurement_request else ""),
             "PAYMENT_DOCUMENT": item.basis_reference or "",
             "PAYMENT_PURPOSE": item.notes or item.basis_reference or f"Оплата по счету № {item.number}",
             "PAYMENT_PRIORITY": "5",
