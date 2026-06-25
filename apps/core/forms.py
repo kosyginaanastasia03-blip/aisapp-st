@@ -907,7 +907,39 @@ class SupplierForm(BaseStyledForm, forms.ModelForm):
         widgets = {
             "address": forms.Textarea(attrs={"rows": 3}),
             "requisites": forms.Textarea(attrs={"rows": 4}),
+            "tax_id": forms.TextInput(attrs={
+                "inputmode": "numeric",
+                "pattern": "[0-9]*",
+                "maxlength": "12",
+                "oninput": "this.value=this.value.replace(/[^0-9]/g,'')",
+            }),
+            "ogrnip": forms.TextInput(attrs={
+                "inputmode": "numeric",
+                "pattern": "[0-9]*",
+                "maxlength": "15",
+                "oninput": "this.value=this.value.replace(/[^0-9]/g,'')",
+            }),
         }
+
+    def _clean_digits(self, value, allowed_lengths, label):
+        value = (value or "").strip()
+        if not value:
+            return value
+        if not value.isdigit():
+            raise forms.ValidationError(f"{label} должен содержать только цифры.")
+        if len(value) not in allowed_lengths:
+            if len(allowed_lengths) == 1:
+                expected = f"{allowed_lengths[0]} цифр"
+            else:
+                expected = " или ".join(f"{n} цифр" for n in allowed_lengths)
+            raise forms.ValidationError(f"{label} должен содержать {expected} (введено {len(value)}).")
+        return value
+
+    def clean_tax_id(self):
+        return self._clean_digits(self.cleaned_data.get("tax_id"), (10, 12), "ИНН")
+
+    def clean_ogrnip(self):
+        return self._clean_digits(self.cleaned_data.get("ogrnip"), (15,), "ОГРНИП")
 
     def clean(self):
         cleaned_data = super().clean()
@@ -1231,6 +1263,60 @@ class SupplyContractForm(BaseStyledForm, forms.ModelForm):
             "contract_date": DateInput(),
             "terms": forms.Textarea(attrs={"rows": 3}),
         }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        supplier = cleaned_data.get("supplier")
+        if not supplier:
+            return cleaned_data
+
+        from django.db.models import Sum
+
+        # Один поставщик — один действующий (не исчерпанный по бюджету) договор поставки.
+        existing_contracts = SupplyContract.objects.filter(
+            supplier=supplier,
+            status__in=[
+                DocumentStatus.APPROVAL,
+                DocumentStatus.APPROVED,
+                DocumentStatus.SENT_ACCOUNTING,
+                DocumentStatus.ACCEPTED,
+            ],
+        )
+        if self.instance.pk:
+            existing_contracts = existing_contracts.exclude(pk=self.instance.pk)
+
+        for contract in existing_contracts:
+            if not contract.amount:
+                # Договор без ограничения по сумме считается действующим всегда.
+                self.add_error(
+                    "supplier",
+                    f"У поставщика «{supplier.name}» уже есть действующий договор поставки "
+                    f"№{contract.number} без ограничения по сумме. Новый договор создать нельзя, "
+                    f"пока действует текущий.",
+                )
+                break
+
+            spent = SupplierDocument.objects.filter(
+                supply_contract=contract,
+                status__in=[
+                    DocumentStatus.APPROVED,
+                    DocumentStatus.ACCEPTED,
+                    DocumentStatus.SENT_ACCOUNTING,
+                ],
+            ).aggregate(total=Sum("amount"))["total"] or 0
+
+            if spent < contract.amount:
+                remaining = contract.amount - spent
+                self.add_error(
+                    "supplier",
+                    f"У поставщика «{supplier.name}» уже есть действующий договор поставки "
+                    f"№{contract.number} (остаток бюджета {remaining:,.2f} руб. из "
+                    f"{contract.amount:,.2f} руб.). Новый договор можно создать только после "
+                    f"того, как бюджет текущего договора будет полностью израсходован.",
+                )
+                break
+
+        return cleaned_data
 
 
 class UserForm(BaseStyledForm, forms.ModelForm):
